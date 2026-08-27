@@ -74,6 +74,12 @@ export default function ScrollVideoHero() {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const textStageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Animation refs
+  const rafRef = useRef<number | null>(null);
+  const targetProgressRef = useRef(0);
+  const currentProgressRef = useRef(0);
+  const isVideoReadyRef = useRef(false);
+
   useEffect(() => {
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -81,24 +87,31 @@ export default function ScrollVideoHero() {
 
     const section = sectionRef.current;
     const pinContainer = pinContainerRef.current;
-    if (!section || !pinContainer) return;
+    const video = videoRef.current;
+    if (!section || !pinContainer || !video) return;
 
-    // Ensure video plays smoothly
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {
-        // Autoplay may need user gesture on some strict mobile browsers
-      });
+    // Pause video so scroll controls currentTime
+    video.pause();
+
+    const handleLoadedMetadata = () => {
+      isVideoReadyRef.current = true;
+      video.currentTime = 0;
+    };
+
+    if (video.readyState >= 1) {
+      handleLoadedMetadata();
+    } else {
+      video.addEventListener("loadedmetadata", handleLoadedMetadata);
     }
 
     if (prefersReduced) {
-      // Just make first stage visible
       if (textStageRefs.current[0]) {
         gsap.set(textStageRefs.current[0], { opacity: 1, y: 0 });
       }
       return;
     }
 
-    // Initialize all stages: first stage visible, others hidden
+    // Initialize all stages
     textStageRefs.current.forEach((el, i) => {
       if (el) {
         gsap.set(el, {
@@ -109,78 +122,104 @@ export default function ScrollVideoHero() {
       }
     });
 
+    // ── Continuous RAF loop for ultra-smooth video scrubbing & text sync ──
+    const scrubLoop = () => {
+      const target = targetProgressRef.current;
+      const current = currentProgressRef.current;
+      const diff = target - current;
+
+      if (Math.abs(diff) > 0.0005) {
+        currentProgressRef.current += diff * 0.15;
+      } else {
+        currentProgressRef.current = target;
+      }
+
+      const p = currentProgressRef.current;
+
+      // Scrub video currentTime
+      if (video && video.duration && !isNaN(video.duration)) {
+        const targetTime = Math.max(
+          0,
+          Math.min(video.duration - 0.05, p * video.duration)
+        );
+        // Only update if difference is meaningful to prevent micro-jank
+        if (Math.abs(video.currentTime - targetTime) > 0.03) {
+          video.currentTime = targetTime;
+        }
+      }
+
+      // Update side progress line
+      if (progressBarRef.current) {
+        progressBarRef.current.style.height = `${p * 100}%`;
+      }
+
+      // Animate text stages
+      heroStages.forEach((stage, i) => {
+        const el = textStageRefs.current[i];
+        if (!el) return;
+
+        const { startPct, endPct } = stage;
+        const fadeBand = (endPct - startPct) * 0.22;
+
+        if (p >= startPct && p <= endPct) {
+          let opacity = 1;
+          let y = 0;
+
+          if (p < startPct + fadeBand) {
+            // Fading in
+            const t = (p - startPct) / fadeBand;
+            opacity = t;
+            y = (1 - t) * 28;
+          } else if (p > endPct - fadeBand) {
+            // Fading out
+            const t = (p - (endPct - fadeBand)) / fadeBand;
+            opacity = 1 - t;
+            y = -t * 22;
+          }
+
+          gsap.set(el, { opacity, y });
+        } else {
+          gsap.set(el, {
+            opacity: 0,
+            y: p < startPct ? 30 : -20,
+          });
+        }
+      });
+
+      rafRef.current = requestAnimationFrame(scrubLoop);
+    };
+
+    rafRef.current = requestAnimationFrame(scrubLoop);
+
+    // ── GSAP ScrollTrigger to capture scroll position ──
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=350%",
-        scrub: 0.8,
+        end: "+=380%",
+        scrub: 0.5,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
-          const progress = self.progress;
-
-          // Update side progress line
-          if (progressBarRef.current) {
-            progressBarRef.current.style.height = `${progress * 100}%`;
-          }
-
-          // Subtle video zoom/parallax during scroll
-          if (videoRef.current) {
-            gsap.set(videoRef.current, {
-              scale: 1 + progress * 0.08,
-              opacity: 1 - progress * 0.15,
-            });
-          }
+          targetProgressRef.current = self.progress;
 
           // Fade out scroll indicator
           if (scrollIndicatorRef.current) {
             gsap.to(scrollIndicatorRef.current, {
-              opacity: progress > 0.03 ? 0 : 1,
-              y: progress > 0.03 ? -10 : 0,
+              opacity: self.progress > 0.03 ? 0 : 1,
+              y: self.progress > 0.03 ? -10 : 0,
               duration: 0.3,
               overwrite: true,
             });
           }
-
-          // Animate text stages
-          heroStages.forEach((stage, i) => {
-            const el = textStageRefs.current[i];
-            if (!el) return;
-
-            const { startPct, endPct } = stage;
-            const fadeBand = (endPct - startPct) * 0.2;
-
-            if (progress >= startPct && progress <= endPct) {
-              let opacity = 1;
-              let y = 0;
-
-              if (progress < startPct + fadeBand) {
-                // Fading in
-                const t = (progress - startPct) / fadeBand;
-                opacity = t;
-                y = (1 - t) * 24;
-              } else if (progress > endPct - fadeBand) {
-                // Fading out
-                const t = (progress - (endPct - fadeBand)) / fadeBand;
-                opacity = 1 - t;
-                y = -t * 20;
-              }
-
-              gsap.set(el, { opacity, y });
-            } else {
-              gsap.set(el, {
-                opacity: 0,
-                y: progress < startPct ? 30 : -20,
-              });
-            }
-          });
         },
       });
     }, section);
 
     return () => {
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       ctx.revert();
     };
   }, []);

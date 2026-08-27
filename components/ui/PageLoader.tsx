@@ -4,16 +4,14 @@ import { useEffect, useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function PageLoader() {
-  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(true);
   const [progress, setProgress] = useState(0);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
-  const DURATION = 2000;
+  const DURATION = 1800;
 
   useEffect(() => {
-    setMounted(true);
     if (typeof window !== "undefined" && sessionStorage.getItem("vg-loader-shown")) {
       setLoading(false);
       setVisible(false);
@@ -33,16 +31,18 @@ export default function PageLoader() {
         setTimeout(() => {
           setLoading(false);
           sessionStorage.setItem("vg-loader-shown", "1");
-          setTimeout(() => setVisible(false), 900);
-        }, 300);
+          setTimeout(() => setVisible(false), 800);
+        }, 200);
       }
     };
 
     rafRef.current = requestAnimationFrame(animate);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, []);
 
-  if (!mounted || !visible) return null;
+  if (!visible) return null;
 
   return (
     <AnimatePresence>

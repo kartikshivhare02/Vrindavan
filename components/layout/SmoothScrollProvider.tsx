@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -13,6 +14,7 @@ export default function SmoothScrollProvider({
   children: React.ReactNode;
 }) {
   const lenisRef = useRef<Lenis | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     // Respect prefers-reduced-motion
@@ -21,6 +23,10 @@ export default function SmoothScrollProvider({
     ).matches;
 
     if (prefersReduced) return;
+
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
 
     const lenis = new Lenis({
       duration: 1.0,
@@ -49,6 +55,25 @@ export default function SmoothScrollProvider({
       lenis.destroy();
     };
   }, []);
+
+  // Ensure every route change scrolls to top immediately
+  useEffect(() => {
+    if (lenisRef.current) {
+      lenisRef.current.scrollTo(0, { immediate: true });
+    }
+    window.scrollTo(0, 0);
+
+    // Give the DOM a frame to layout before refreshing ScrollTrigger
+    const timer = setTimeout(() => {
+      if (lenisRef.current) {
+        lenisRef.current.scrollTo(0, { immediate: true });
+      }
+      window.scrollTo(0, 0);
+      ScrollTrigger.refresh();
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
   return <>{children}</>;
 }
