@@ -1,75 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { usePathname } from "next/navigation";
-import {
-  startHeroFramesPreload,
-  subscribeHeroProgress,
-  isHeroFramesLoaded,
-  TOTAL_HERO_FRAMES,
-} from "@/lib/heroFrameLoader";
 
 export default function PageLoader() {
-  const pathname = usePathname();
-  const isHomePage = pathname === "/";
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [loadedCount, setLoadedCount] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+  const DURATION = 2000;
 
   useEffect(() => {
     setMounted(true);
-
-    // If not homepage, or already fully loaded in session
-    if (!isHomePage) {
-      setProgress(100);
-      const timer = setTimeout(() => {
-        setLoading(false);
-        setTimeout(() => setVisible(false), 600);
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-
-    if (isHeroFramesLoaded()) {
-      setProgress(100);
+    if (typeof window !== "undefined" && sessionStorage.getItem("vg-loader-shown")) {
       setLoading(false);
       setVisible(false);
       return;
     }
 
-    // Start real frames preload
-    startHeroFramesPreload(16);
+    const animate = (timestamp: number) => {
+      if (!startRef.current) startRef.current = timestamp;
+      const elapsed = timestamp - startRef.current;
+      const raw = elapsed / DURATION;
+      const eased = 1 - Math.pow(1 - Math.min(raw, 1), 2.5);
+      setProgress(Math.min(eased * 100, 100));
 
-    // Subscribe to real loading progress
-    const unsubscribe = subscribeHeroProgress(
-      (loaded, total, percent) => {
-        setLoadedCount(loaded);
-        setProgress(percent);
-      },
-      () => {
-        // All frames loaded 100%
-        setProgress(100);
+      if (raw < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
         setTimeout(() => {
           setLoading(false);
-          setTimeout(() => setVisible(false), 800);
+          sessionStorage.setItem("vg-loader-shown", "1");
+          setTimeout(() => setVisible(false), 900);
         }, 300);
       }
-    );
-
-    // Safety fallback: in case of extreme slow network or stalled image
-    const safetyTimer = setTimeout(() => {
-      setProgress(100);
-      setLoading(false);
-      setTimeout(() => setVisible(false), 800);
-    }, 45000);
-
-    return () => {
-      unsubscribe();
-      clearTimeout(safetyTimer);
     };
-  }, [isHomePage]);
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
 
   if (!mounted || !visible) return null;
 
@@ -167,27 +138,20 @@ export default function PageLoader() {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="relative z-10 flex flex-col items-center gap-3"
           >
-            <div style={{ width: 180, height: 2, background: "rgba(255,255,255,0.08)", position: "relative", overflow: "hidden", borderRadius: "1px" }}>
+            <div style={{ width: 160, height: 1, background: "rgba(255,255,255,0.07)", position: "relative", overflow: "hidden" }}>
               <div
                 style={{
                   position: "absolute", inset: 0,
                   background: "linear-gradient(90deg, #a07830, #c9a84c, #e0c578)",
                   width: `${progress}%`,
-                  transition: "width 0.12s ease-out",
-                  boxShadow: "0 0 10px rgba(201,168,76,0.6)",
+                  transition: "width 0.06s linear",
+                  boxShadow: "0 0 8px rgba(201,168,76,0.5)",
                 }}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <p style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", fontSize: "0.65rem", letterSpacing: "0.2em", color: "rgba(201,168,76,0.85)", fontWeight: 500 }}>
-                {Math.round(progress)}%
-              </p>
-              {isHomePage && (
-                <span style={{ fontSize: "0.55rem", letterSpacing: "0.15em", color: "rgba(255,255,255,0.25)", textTransform: "uppercase" }}>
-                  ({loadedCount}/{TOTAL_HERO_FRAMES})
-                </span>
-              )}
-            </div>
+            <p style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", fontSize: "0.6rem", letterSpacing: "0.15em", color: "rgba(255,255,255,0.18)" }}>
+              {Math.round(progress)}
+            </p>
           </motion.div>
         </motion.div>
       )}

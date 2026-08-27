@@ -5,18 +5,13 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import {
-  heroFramesCache,
-  startHeroFramesPreload,
-  TOTAL_HERO_FRAMES,
-  getHeroFramePath,
-} from "@/lib/heroFrameLoader";
 
 gsap.registerPlugin(ScrollTrigger);
 
 // ─── Configuration ─────────────────────────────────────────────────────────
-const TOTAL_FRAMES = TOTAL_HERO_FRAMES;
-const FRAME_PATH = getHeroFramePath;
+const TOTAL_FRAMES = 480;
+const FRAME_PATH = (i: number) =>
+  `/hero-frames/frame_${String(i).padStart(6, "0")}.jpeg`;
 
 /** Lerp factor — controls cinematic inertia (0.08 = slow, 0.18 = snappy) */
 const LERP_FACTOR = 0.12;
@@ -128,6 +123,7 @@ export default function ScrollVideoHero() {
   const rafRef = useRef<number | null>(null);
   const targetFrameRef = useRef(0);
   const currentFrameRef = useRef(0);
+  const frameCache = useRef<Map<number, HTMLImageElement>>(new Map());
   const loadingSet = useRef<Set<number>>(new Set());
   const isMobile = useRef(false);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -152,7 +148,7 @@ export default function ScrollVideoHero() {
     canvasDims.current = { w, h };
 
     // Redraw current frame after resize
-    const img = heroFramesCache.get(Math.round(currentFrameRef.current));
+    const img = frameCache.current.get(Math.round(currentFrameRef.current));
     if (img?.complete && img.naturalWidth) {
       ctx.clearRect(0, 0, w, h);
       drawCoverFrame(ctx, img, w, h);
@@ -163,8 +159,8 @@ export default function ScrollVideoHero() {
   const loadFrame = useCallback(
     (index: number, onLoad?: (img: HTMLImageElement) => void) => {
       if (index < 0 || index >= TOTAL_FRAMES) return;
-      if (heroFramesCache.has(index)) {
-        if (onLoad) onLoad(heroFramesCache.get(index)!);
+      if (frameCache.current.has(index)) {
+        if (onLoad) onLoad(frameCache.current.get(index)!);
         return;
       }
       if (loadingSet.current.has(index)) return;
@@ -173,9 +169,18 @@ export default function ScrollVideoHero() {
       const img = new window.Image();
       img.src = FRAME_PATH(index);
       img.onload = () => {
-        heroFramesCache.set(index, img);
+        frameCache.current.set(index, img);
         loadingSet.current.delete(index);
         if (onLoad) onLoad(img);
+        // Evict distant frames on mobile to free memory
+        if (isMobile.current) {
+          const current = Math.round(currentFrameRef.current);
+          frameCache.current.forEach((_, key) => {
+            if (Math.abs(key - current) > MOBILE_CACHE_WINDOW) {
+              frameCache.current.delete(key);
+            }
+          });
+        }
       };
       img.onerror = () => {
         loadingSet.current.delete(index);
@@ -198,11 +203,12 @@ export default function ScrollVideoHero() {
 
   // ── Get nearest available frame (never show black) ─────────────────────────
   const getNearestLoadedFrame = useCallback((target: number): HTMLImageElement | null => {
-    if (heroFramesCache.has(target)) return heroFramesCache.get(target)!;
+    const cache = frameCache.current;
+    if (cache.has(target)) return cache.get(target)!;
 
     for (let radius = 1; radius < 30; radius++) {
-      if (heroFramesCache.has(target - radius)) return heroFramesCache.get(target - radius)!;
-      if (heroFramesCache.has(target + radius)) return heroFramesCache.get(target + radius)!;
+      if (cache.has(target - radius)) return cache.get(target - radius)!;
+      if (cache.has(target + radius)) return cache.get(target + radius)!;
     }
     return null;
   }, []);
@@ -281,13 +287,29 @@ export default function ScrollVideoHero() {
       return;
     }
 
-    // ── Phase 1: Draw first frame immediately if available ──────────────────
+    // ── Phase 1: Load frame 0 immediately and show hero ──────────────────────
     loadFrame(0, (img) => {
       drawCoverFrame(ctx, img, w, h);
     });
 
-    // ── Phase 2: Start high-performance worker pool preload ──────────────────
-    startHeroFramesPreload(16);
+    // ── Phase 2: Eagerly preload first N frames ───────────────────────────────
+    for (let i = 1; i <= EAGER_PRELOAD_COUNT; i++) {
+      loadFrame(i);
+    }
+
+    // ── Phase 3: Background load remaining frames ─────────────────────────────
+    // Stagger to not saturate the network
+    let bgIdx = EAGER_PRELOAD_COUNT + 1;
+    const bgInterval = setInterval(() => {
+      if (bgIdx >= TOTAL_FRAMES) {
+        clearInterval(bgInterval);
+        return;
+      }
+      // Load a small batch per tick
+      for (let b = 0; b < 4 && bgIdx < TOTAL_FRAMES; b++, bgIdx++) {
+        loadFrame(bgIdx);
+      }
+    }, 50);
 
     // ── Initialize text stages ───────────────────────────────────────────────
     textStageRefs.current.forEach((el) => {
@@ -376,9 +398,12 @@ export default function ScrollVideoHero() {
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
+      clearInterval(bgInterval);
       ctx2.revert();
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", handleResize);
+      // Release image references
+      frameCache.current.clear();
       loadingSet.current.clear();
       ctxRef.current = null;
     };
