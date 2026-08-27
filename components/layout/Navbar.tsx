@@ -39,34 +39,23 @@ export default function Navbar() {
       >
         <div className="container-wide flex items-center justify-between">
 
-          {/* ── Logo — always image, always in white stamp container ── */}
+          {/* ── Logo — Clean transparent PNG directly on navbar ── */}
           <Link href="/" className="block" aria-label="Vrindavan Group — Home">
             <div
-              className="flex items-center justify-center transition-all duration-400"
+              className="relative transition-all duration-400 flex items-center"
               style={{
-                background: "white",
-                padding: scrolled ? "5px 10px" : "7px 14px",
-                boxShadow: scrolled
-                  ? "none"
-                  : "0 2px 16px rgba(0,0,0,0.25)",
+                width: scrolled ? "140px" : "165px",
+                height: scrolled ? "44px" : "52px",
               }}
             >
-              <div
-                className="relative transition-all duration-400"
-                style={{
-                  width: scrolled ? "110px" : "130px",
-                  height: scrolled ? "40px" : "50px",
-                }}
-              >
-                <Image
-                  src="/logo/vrindavan-logo.jpeg"
-                  alt="Vrindavan Group"
-                  fill
-                  sizes="(max-width: 768px) 110px, 130px"
-                  className="object-contain object-center"
-                  priority
-                />
-              </div>
+              <Image
+                src="/logo/vrindavan-logo.png"
+                alt="Vrindavan Group"
+                fill
+                sizes="(max-width: 768px) 140px, 165px"
+                className="object-contain object-left"
+                priority
+              />
             </div>
           </Link>
 
@@ -129,10 +118,8 @@ export default function Navbar() {
           >
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid #e8e3d8" }}>
               {/* Logo in mobile menu header */}
-              <div style={{ background: "white", padding: "4px 10px", display: "inline-block" }}>
-                <div style={{ position: "relative", width: "110px", height: "40px" }}>
-                  <Image src="/logo/vrindavan-logo.jpeg" alt="Vrindavan Group" fill sizes="110px" className="object-contain object-center" />
-                </div>
+              <div style={{ position: "relative", width: "130px", height: "42px" }}>
+                <Image src="/logo/vrindavan-logo.png" alt="Vrindavan Group" fill sizes="130px" className="object-contain object-left" />
               </div>
               <button
                 onClick={() => setMobileOpen(false)}

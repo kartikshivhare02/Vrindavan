@@ -69,37 +69,41 @@ export default function ChannelPartner() {
     >
       <div className="container-wide">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          {/* Image + Badge */}
+          {/* Image + Badge (Squared Luxury Frame) */}
           <div className="partner-reveal opacity-0 relative flex justify-center lg:justify-start">
-            <div className="relative">
+            <div className="relative w-full max-w-[340px] sm:max-w-[380px]">
+              {/* Background decorative offset square */}
               <div
-                className="relative overflow-hidden rounded-full bg-ivory border-2 border-brand-gold/20"
-                style={{ width: "280px", height: "280px" }}
-              >
+                className="absolute -bottom-3 -right-3 w-full h-full border-2 border-brand-gold/30 rounded-2xl pointer-events-none"
+                aria-hidden="true"
+              />
+
+              {/* Main Squared Image Container */}
+              <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-ivory border border-brand-gold/25 shadow-xl">
                 {/* Hardik Shivhare — Channel Partner photo */}
                 <Image
                   src="/images/hardikshivhare.png"
                   alt={`${siteConfig.channelPartner.name} — Authorised Channel Partner, Vrindavan Group`}
                   fill
-                  className="object-cover object-center"
-                  sizes="280px"
+                  className="object-cover object-top"
+                  sizes="(max-width: 768px) 340px, 380px"
                   priority
+                />
+
+                {/* Subtle bottom gradient overlay for luxury feel */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none"
+                  aria-hidden="true"
                 />
               </div>
 
               {/* Authorized badge */}
-              <div className="absolute -top-1 -right-1 bg-brand-green text-white px-3 py-1.5 rounded-full shadow-md z-10">
-                <p className="font-body tracking-wider uppercase" style={{ fontSize: "0.55rem", fontWeight: 700 }}>
+              <div className="absolute top-4 right-4 bg-brand-green text-white px-3.5 py-1.5 rounded-full shadow-lg z-10 border border-brand-gold/30 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-pulse" />
+                <p className="font-body tracking-wider uppercase text-[0.62rem] font-bold">
                   Authorised Partner
                 </p>
               </div>
-
-              {/* Decorative circular line */}
-              <div
-                className="absolute -top-2.5 -left-2.5 border border-brand-gold/20 rounded-full pointer-events-none"
-                style={{ width: "300px", height: "300px" }}
-                aria-hidden="true"
-              />
             </div>
           </div>
 
