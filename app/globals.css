@@ -1,26 +1,398 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 Custom Theme ─────────────────────────────────────────────── */
+@theme {
+  /* Brand Colors */
+  --color-brand-green: #2d6a4f;
+  --color-brand-green-light: #4a7c59;
+  --color-brand-green-dark: #1b4332;
+  --color-brand-green-muted: #52796f;
+  --color-brand-gold: #c9a84c;
+  --color-brand-gold-light: #e0c578;
+  --color-brand-gold-dark: #a07830;
+
+  /* Neutrals — premium warm palette */
+  --color-charcoal: #111111;
+  --color-charcoal-light: #1e1e1e;
+  --color-charcoal-mid: #444444;
+  --color-charcoal-soft: #888888;
+  --color-ivory: #fafaf8;
+  --color-ivory-dark: #f0ede6;
+  --color-ivory-warm: #e8e3d8;
+  --color-beige: #d4c5b0;
+  --color-beige-light: #ede8e0;
+
+  /* Fonts */
+  --font-heading: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-body: var(--font-inter), Inter, system-ui, sans-serif;
+
+  /* Shadows */
+  --shadow-card: 0 2px 20px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 12px 48px rgba(0, 0, 0, 0.12);
+  --shadow-gold: 0 4px 24px rgba(201, 168, 76, 0.18);
+}
+
+/* ── CSS Custom Properties ────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ease-premium: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-premium: cubic-bezier(0.76, 0, 0.24, 1);
+
+  /* Design tokens as plain CSS vars */
+  --page-bg: #fafaf8;
+  --section-alt-bg: #f0ede6;
+  --gold: #c9a84c;
+  --gold-light: #e0c578;
+  --charcoal: #111111;
+  --border-warm: rgba(201, 168, 76, 0.15);
+  --border-ivory: #e8e3d8;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base Reset ───────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  background-color: var(--page-bg);
+  color: var(--charcoal);
+  overflow-x: hidden;
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Heading & paragraph base — inside @layer base so Tailwind utilities override ── */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-playfair), "Playfair Display", Georgia, serif;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    color: #111111; /* overridden by text-white, text-charcoal etc. */
+  }
+
+  p {
+    line-height: 1.72;
+    color: #444444;
+  }
+}
+
+/* ── Selection ────────────────────────────────────────────────────────────── */
+::selection {
+  background-color: rgba(201, 168, 76, 0.25);
+  color: #111111;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #f0ede6;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9a84c;
+  border-radius: 2px;
+}
+
+/* ── Focus Styles ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #c9a84c;
+  outline-offset: 3px;
+}
+
+/* ── Hero Canvas (scroll-controlled frame sequence) ───────────────────────── */
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Section Spacing ──────────────────────────────────────────────────────── */
+.section-padding {
+  padding-block: clamp(5rem, 9vw, 9rem);
+}
+
+/* ── Max Width Containers ─────────────────────────────────────────────────── */
+.container-wide {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 5rem);
+}
+
+.container-narrow {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 5rem);
+}
+
+/* ── Section Label (eyebrow) ──────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #c9a84c;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* ── Gold Divider ─────────────────────────────────────────────────────────── */
+.gold-rule {
+  display: block;
+  width: 3rem;
+  height: 1px;
+  background: #c9a84c;
+  margin: 1.5rem 0;
+}
+
+.gold-rule-center {
+  display: block;
+  width: 3rem;
+  height: 1px;
+  background: #c9a84c;
+  margin: 1.5rem auto;
+}
+
+/* ── Button Base ──────────────────────────────────────────────────────────── */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: all 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  padding: 0.9rem 2rem;
+  border-radius: 1px;
+  line-height: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gold fill button — primary CTA */
+.btn-gold {
+  background: #c9a84c;
+  color: #111111;
+  border: 1.5px solid #c9a84c;
+}
+.btn-gold::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #e0c578;
+  transform: translateX(-100%);
+  transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(201, 168, 76, 0.3);
+}
+.btn-gold:hover::before {
+  transform: translateX(0);
+}
+.btn-gold span,
+.btn-gold svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* Outline gold */
+.btn-outline-gold {
+  background: transparent;
+  color: #c9a84c;
+  border: 1.5px solid #c9a84c;
+}
+.btn-outline-gold:hover {
+  background: #c9a84c;
+  color: #111111;
+  transform: translateY(-2px);
+}
+
+/* Dark fill — secondary CTA */
+.btn-dark {
+  background: #111111;
+  color: white;
+  border: 1.5px solid #111111;
+}
+.btn-dark:hover {
+  background: transparent;
+  color: #111111;
+  transform: translateY(-2px);
+}
+
+/* White outline (hero/dark bg) */
+.btn-outline-white {
+  background: transparent;
+  color: white;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+.btn-outline-white:hover {
+  background: white;
+  color: #111111;
+  border-color: white;
+}
+
+/* Legacy compat */
+.btn-primary {
+  background: #c9a84c;
+  color: #111111;
+  border: 1.5px solid #c9a84c;
+}
+.btn-primary:hover {
+  background: #e0c578;
+  transform: translateY(-2px);
+}
+
+/* ── Navbar ───────────────────────────────────────────────────────────────── */
+.navbar-scrolled {
+  background: rgba(250, 250, 248, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(201, 168, 76, 0.12);
+  box-shadow: 0 1px 24px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.card-premium {
+  background: white;
+  border: 1px solid var(--border-ivory);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.card-premium:hover {
+  border-color: rgba(201, 168, 76, 0.35);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-3px);
+}
+
+/* ── Project Card ─────────────────────────────────────────────────────────── */
+.project-card-img {
+  transition: transform 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.project-card:hover .project-card-img {
+  transform: scale(1.05);
+}
+
+/* ── WhatsApp Button ──────────────────────────────────────────────────────── */
+.whatsapp-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 500;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #25d366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.35);
+  transition: transform 0.3s var(--ease-premium),
+              box-shadow 0.3s var(--ease-premium);
+}
+.whatsapp-btn:hover {
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 8px 32px rgba(37, 211, 102, 0.45);
+}
+
+/* ── Lightbox ─────────────────────────────────────────────────────────────── */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.97);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Scroll indicator animation ───────────────────────────────────────────── */
+@keyframes scrollDown {
+  0%   { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(12px); opacity: 0; }
+}
+.animate-scroll-down {
+  animation: scrollDown 1.5s ease-in-out infinite;
+}
+
+/* ── Gold shimmer pulse ────────────────────────────────────────────────────── */
+@keyframes goldPulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+.animate-gold-pulse {
+  animation: goldPulse 2s ease-in-out infinite;
+}
+
+/* ── Loader progress bar fill ─────────────────────────────────────────────── */
+@keyframes loaderFill {
+  0%   { width: 0; }
+  100% { width: 100%; }
+}
+
+/* ── Custom Utilities ─────────────────────────────────────────────────────── */
+.projects-scroll::-webkit-scrollbar {
+  display: none;
+}
+.projects-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 640px) {
+  .form-row-responsive {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #lifestyle .grid > div:nth-child(even) {
+    border-right: none !important;
+  }
+  #lifestyle .grid > div:nth-child(n+7) {
+    border-bottom: none !important;
+  }
+  #lifestyle .grid > div:nth-child(5),
+  #lifestyle .grid > div:nth-child(6) {
+    border-bottom: 1px solid rgba(201,168,76,0.15) !important;
+  }
+}
+
+/* ── Reduced Motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
