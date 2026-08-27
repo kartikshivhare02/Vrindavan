@@ -1,12 +1,23 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { ArrowRight, Play, Pause } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
+
+// ─── Configuration ─────────────────────────────────────────────────────────
+const TOTAL_FRAMES = 480;
+const FRAME_PATH = (i: number) =>
+  `/hero-frames/frame_${String(i).padStart(6, "0")}.jpeg`;
+
+/** Lerp factor — controls cinematic inertia (0.12 = smooth and responsive) */
+const LERP_FACTOR = 0.14;
+
+/** How many frames to eagerly preload on initial load */
+const INITIAL_PRELOAD_COUNT = 24;
 
 // ─── Hero text stages ───────────────────────────────────────────────────────
 interface HeroStage {
@@ -22,7 +33,7 @@ interface HeroStage {
 const heroStages: HeroStage[] = [
   {
     startPct: 0,
-    endPct: 0.2,
+    endPct: 0.18,
     eyebrow: "WELCOME TO",
     title: "VRINDAVAN\nGROUP",
     subtitle: "Building Landmarks. Creating Communities.",
@@ -32,31 +43,31 @@ const heroStages: HeroStage[] = [
     ],
   },
   {
-    startPct: 0.25,
-    endPct: 0.45,
+    startPct: 0.22,
+    endPct: 0.42,
     eyebrow: "LEGACY OF EXCELLENCE",
     title: "20+ YEARS",
     subtitle: "OF UNMATCHED TRUST & VISION",
-    body: "Creating thoughtfully planned gated townships across prime locations in Indore.",
+    body: "Creating thoughtfully planned gated townships across prime growth locations in Indore.",
   },
   {
-    startPct: 0.5,
-    endPct: 0.7,
+    startPct: 0.46,
+    endPct: 0.64,
     eyebrow: "OUR COMMUNITY",
     title: "2000+",
     subtitle: "HAPPY & DELIGHTED FAMILIES",
-    body: "Thousands of families have made Vrindavan their lifelong sanctuary of peace and pride.",
+    body: "Thousands of families have made Vrindavan their lifelong sanctuary of peace, luxury, and pride.",
   },
   {
-    startPct: 0.75,
-    endPct: 0.9,
+    startPct: 0.68,
+    endPct: 0.84,
     eyebrow: "PRIME LANDMARKS",
     title: "PREMIUM\nTOWNSHIPS",
     subtitle: "ACROSS INDORE'S GROWTH CORRIDORS",
     body: "Super Corridor, Rau, SuryaMandir RRCAT, AB Road — RERA approved, high-appreciation properties.",
   },
   {
-    startPct: 0.92,
+    startPct: 0.88,
     endPct: 1,
     eyebrow: "EXCLUSIVE LIVING",
     title: "Your Dream\nAddress Awaits.",
@@ -71,25 +82,197 @@ const heroStages: HeroStage[] = [
   },
 ];
 
+// ─── Cover-crop draw helper ──────────────────────────────────────────────────
+function drawCoverFrame(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  canvasW: number,
+  canvasH: number
+) {
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  if (!imgW || !imgH) return;
+
+  const canvasAspect = canvasW / canvasH;
+  const imgAspect = imgW / imgH;
+
+  let sx = 0,
+    sy = 0,
+    sw = imgW,
+    sh = imgH;
+
+  if (imgAspect > canvasAspect) {
+    sw = imgH * canvasAspect;
+    sx = (imgW - sw) / 2;
+  } else {
+    sh = imgW / canvasAspect;
+    sy = (imgH - sh) / 2;
+  }
+
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+}
+
 export default function ScrollVideoHero() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const pinContainerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const scrollIndicatorRef = useRef<HTMLDivElement>(null);
   const textStageRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [isPlaying, setIsPlaying] = useState(true);
 
+  // Animation state refs (no re-renders)
+  const rafRef = useRef<number | null>(null);
+  const targetFrameRef = useRef(0);
+  const currentFrameRef = useRef(0);
+  const frameCache = useRef<Map<number, HTMLImageElement>>(new Map());
+  const loadingSet = useRef<Set<number>>(new Set());
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasDims = useRef({ w: 0, h: 0 });
+
+  // ── Canvas resize helper ───────────────────────────────────────────────────
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    ctx.scale(dpr, dpr);
+
+    canvasDims.current = { w, h };
+
+    const img = frameCache.current.get(Math.round(currentFrameRef.current));
+    if (img?.complete && img.naturalWidth) {
+      ctx.clearRect(0, 0, w, h);
+      drawCoverFrame(ctx, img, w, h);
+    }
+  }, []);
+
+  // ── Frame Loader ──────────────────────────────────────────────────────────
+  const loadFrame = useCallback(
+    (index: number, onLoad?: (img: HTMLImageElement) => void) => {
+      if (index < 0 || index >= TOTAL_FRAMES) return;
+      if (frameCache.current.has(index)) {
+        const img = frameCache.current.get(index)!;
+        if (img.complete && img.naturalWidth && onLoad) {
+          onLoad(img);
+        }
+        return;
+      }
+      if (loadingSet.current.has(index)) return;
+
+      loadingSet.current.add(index);
+      const img = new window.Image();
+      img.src = FRAME_PATH(index);
+      img.onload = () => {
+        frameCache.current.set(index, img);
+        loadingSet.current.delete(index);
+        if (onLoad) onLoad(img);
+      };
+      img.onerror = () => {
+        loadingSet.current.delete(index);
+      };
+    },
+    []
+  );
+
+  // ── On-demand preload around current frame ─────────────────────────────────
+  const preloadAround = useCallback(
+    (center: number, radius: number) => {
+      for (let i = 0; i <= radius; i++) {
+        loadFrame(center + i);
+        if (i > 0) loadFrame(center - i);
+      }
+    },
+    [loadFrame]
+  );
+
+  // ── Get nearest loaded frame (zero black frames) ──────────────────────────
+  const getNearestLoadedFrame = useCallback((target: number): HTMLImageElement | null => {
+    const cache = frameCache.current;
+    if (cache.has(target)) {
+      const img = cache.get(target)!;
+      if (img.complete && img.naturalWidth) return img;
+    }
+
+    for (let radius = 1; radius < 40; radius++) {
+      const prev = cache.get(target - radius);
+      if (prev?.complete && prev.naturalWidth) return prev;
+      const next = cache.get(target + radius);
+      if (next?.complete && next.naturalWidth) return next;
+    }
+    return null;
+  }, []);
+
+  // ── RAF render loop (strictly scroll-driven) ──────────────────────────────
+  const renderLoop = useCallback(() => {
+    const ctx = ctxRef.current;
+    const { w, h } = canvasDims.current;
+
+    // Lerp currentFrame towards targetFrame (set strictly by scroll progress)
+    const diff = targetFrameRef.current - currentFrameRef.current;
+    if (Math.abs(diff) > 0.05) {
+      currentFrameRef.current += diff * LERP_FACTOR;
+    } else {
+      currentFrameRef.current = targetFrameRef.current;
+    }
+
+    const frameIdx = Math.min(
+      TOTAL_FRAMES - 1,
+      Math.max(0, Math.round(currentFrameRef.current))
+    );
+
+    const img = getNearestLoadedFrame(frameIdx);
+    if (ctx && img && w && h) {
+      ctx.clearRect(0, 0, w, h);
+      drawCoverFrame(ctx, img, w, h);
+    }
+
+    // Update progress bar
+    const progressLine = document.getElementById("hero-progress-line");
+    if (progressLine) {
+      const pct = (targetFrameRef.current / (TOTAL_FRAMES - 1)) * 100;
+      progressLine.style.height = `${pct}%`;
+    }
+
+    // Dynamic preload around current position
+    preloadAround(frameIdx, 12);
+
+    rafRef.current = requestAnimationFrame(renderLoop);
+  }, [getNearestLoadedFrame, preloadAround]);
+
+  // ── Main effect ───────────────────────────────────────────────────────────
   useEffect(() => {
     const section = sectionRef.current;
+    const canvas = canvasRef.current;
     const pinContainer = pinContainerRef.current;
-    if (!section || !pinContainer) return;
+    if (!section || !canvas || !pinContainer) return;
 
-    // Start video playback
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {
-        // Autoplay policy fallback
-      });
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+    ctxRef.current = ctx;
+
+    // Initial size
+    resizeCanvas();
+
+    // Load first frame immediately
+    loadFrame(0, (img) => {
+      const { w, h } = canvasDims.current;
+      if (w && h) {
+        ctx.clearRect(0, 0, w, h);
+        drawCoverFrame(ctx, img, w, h);
+      }
+    });
+
+    // Eagerly preload initial window
+    for (let i = 1; i <= INITIAL_PRELOAD_COUNT; i++) {
+      loadFrame(i);
     }
 
     // Initialize text stages visibility
@@ -99,42 +282,43 @@ export default function ScrollVideoHero() {
       }
     });
 
-    const ctx = gsap.context(() => {
+    // Start RAF loop
+    rafRef.current = requestAnimationFrame(renderLoop);
+
+    // GSAP ScrollTrigger: Pin section and scrub targetFrame directly with scroll
+    const ctx2 = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=350%",
-        scrub: 0.8,
+        end: "+=380%",
+        scrub: true,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
           const progress = self.progress;
 
-          // Progress line
-          const progressLine = document.getElementById("hero-progress-line");
-          if (progressLine) {
-            progressLine.style.height = `${progress * 100}%`;
-          }
+          // Target frame is strictly locked to scroll progress
+          targetFrameRef.current = progress * (TOTAL_FRAMES - 1);
 
-          // Fade out scroll indicator after user begins scrolling
+          // Scroll indicator fade
           if (progress > 0.03 && scrollIndicatorRef.current) {
             gsap.to(scrollIndicatorRef.current, {
               opacity: 0,
               y: -15,
-              duration: 0.4,
+              duration: 0.35,
               overwrite: true,
             });
           } else if (progress <= 0.03 && scrollIndicatorRef.current) {
             gsap.to(scrollIndicatorRef.current, {
               opacity: 1,
               y: 0,
-              duration: 0.4,
+              duration: 0.35,
               overwrite: true,
             });
           }
 
-          // Text stages switching
+          // Text stages transition based on scroll position
           heroStages.forEach((stage, i) => {
             const el = textStageRefs.current[i];
             if (!el) return;
@@ -176,46 +360,37 @@ export default function ScrollVideoHero() {
       });
     }, section);
 
-    return () => {
-      ctx.revert();
+    // Resize listener
+    const handleResize = () => {
+      resizeCanvas();
     };
-  }, []);
+    window.addEventListener("resize", handleResize, { passive: true });
 
-  const toggleVideoPlayback = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
-    }
-  };
+    return () => {
+      ctx2.revert();
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", handleResize);
+      frameCache.current.clear();
+      loadingSet.current.clear();
+      ctxRef.current = null;
+    };
+  }, [loadFrame, renderLoop, resizeCanvas]);
 
   return (
     <section
       ref={sectionRef}
       className="relative w-full min-h-screen bg-[#0A0A0A]"
       id="hero"
-      aria-label="Vrindavan Group — Cinematic Hero"
+      aria-label="Vrindavan Group — Scroll Controlled Hero"
     >
       <div
         ref={pinContainerRef}
         className="hero-pin-wrapper relative w-full h-screen overflow-hidden bg-[#0A0A0A]"
       >
-        {/* Hardware-accelerated High Performance Native Video */}
-        <video
-          ref={videoRef}
-          src="/video/vrindavan-hero.mp4"
-          poster="/hero-frames/frame_000000.jpeg"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
+        {/* Canvas — strictly scroll-controlled frame sequence */}
+        <canvas
+          ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover z-0"
-          style={{ willChange: "transform" }}
           aria-hidden="true"
         />
 
@@ -224,7 +399,7 @@ export default function ScrollVideoHero() {
           className="absolute inset-0 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(135deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.3) 40%, rgba(10,10,10,0.65) 100%)",
+              "linear-gradient(135deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0.25) 40%, rgba(10,10,10,0.65) 100%)",
           }}
           aria-hidden="true"
         />
@@ -286,9 +461,7 @@ export default function ScrollVideoHero() {
 
                   {/* Body */}
                   {stage.body && (
-                    <p
-                      className="font-body text-white/80 leading-relaxed max-w-xl mb-6 text-sm md:text-base drop-shadow"
-                    >
+                    <p className="font-body text-white/80 leading-relaxed max-w-xl mb-6 text-sm md:text-base drop-shadow">
                       {stage.body}
                     </p>
                   )}
@@ -320,18 +493,6 @@ export default function ScrollVideoHero() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Video Play/Pause toggle button */}
-        <div className="absolute bottom-10 right-8 z-30 hidden sm:block">
-          <button
-            onClick={toggleVideoPlayback}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/15 text-white/70 hover:text-white text-xs transition-all hover:bg-black/60"
-            aria-label={isPlaying ? "Pause background video" : "Play background video"}
-          >
-            {isPlaying ? <Pause size={12} /> : <Play size={12} />}
-            <span className="text-[11px] uppercase tracking-wider">{isPlaying ? "Pause" : "Play"}</span>
-          </button>
         </div>
 
         {/* Progress Line */}
@@ -367,7 +528,7 @@ export default function ScrollVideoHero() {
             <div className="w-1 h-1.5 bg-[#c9a84c] rounded-full animate-bounce" />
           </div>
           <p className="font-body text-white/50 text-[10px] tracking-[0.25em] uppercase">
-            Scroll Down
+            Scroll to Scrub
           </p>
         </div>
       </div>
