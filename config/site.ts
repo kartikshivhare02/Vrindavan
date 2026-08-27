@@ -21,8 +21,8 @@ export const siteConfig = {
 
   // ── Channel Partner & Official Contact ──────────────────────────────────────
   channelPartner: {
-    name: "Hardik Shivhare",
-    title: "Authorised Channel Partner",
+    name: "Hardik Shivhare & Team",
+    title: "Property & Investment Consultant",
     phone: "+918319590034",
     whatsapp: "+918319590034",
     email: "contact@vrindavangroup.com", // [NEEDS CLIENT INPUT] if separate official email exists

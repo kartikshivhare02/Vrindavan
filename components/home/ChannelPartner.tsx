@@ -80,10 +80,10 @@ export default function ChannelPartner() {
 
               {/* Main Squared Image Container */}
               <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-ivory border border-brand-gold/25 shadow-xl">
-                {/* Hardik Shivhare — Channel Partner photo */}
+                {/* Hardik Shivhare & Team photo */}
                 <Image
-                  src="/images/hardikshivhare.png"
-                  alt={`${siteConfig.channelPartner.name} — Authorised Channel Partner, Vrindavan Group`}
+                  src="/images/hardikshivahare.jpg"
+                  alt={`${siteConfig.channelPartner.name} — Property Consultant, Vrindavan Group`}
                   fill
                   className="object-cover object-top"
                   sizes="(max-width: 768px) 340px, 380px"
@@ -97,11 +97,11 @@ export default function ChannelPartner() {
                 />
               </div>
 
-              {/* Authorized badge */}
+              {/* Property Consultant badge */}
               <div className="absolute top-4 right-4 bg-brand-green text-white px-3.5 py-1.5 rounded-full shadow-lg z-10 border border-brand-gold/30 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-pulse" />
                 <p className="font-body tracking-wider uppercase text-[0.62rem] font-bold">
-                  Authorised Partner
+                  Property Advisory
                 </p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export default function ChannelPartner() {
           <div className="space-y-6">
             <div className="partner-reveal opacity-0">
               <p className="font-body text-xs font-medium tracking-[0.3em] text-brand-gold uppercase mb-4">
-                Your Property Consultant
+                Your Property Consultants
               </p>
               <h2
                 id="partner-heading"
@@ -128,14 +128,13 @@ export default function ChannelPartner() {
             <div className="partner-reveal opacity-0 h-px w-16 bg-brand-gold" aria-hidden="true" />
 
             <p className="partner-reveal opacity-0 font-body text-charcoal-mid leading-relaxed">
-              {siteConfig.channelPartner.name} is an authorised channel partner
-              assisting buyers and investors in discovering suitable Vrindavan
-              Group properties based on their requirements, preferred location,
-              budget and investment goals.
+              {siteConfig.channelPartner.name} assist buyers and investors in discovering
+              suitable Vrindavan Group properties based on their requirements, preferred
+              location, budget, and investment goals.
             </p>
             <p className="partner-reveal opacity-0 font-body text-charcoal-mid leading-relaxed">
-              From the initial project consultation to site-visit coordination,
-              he provides a personalised point of contact throughout your
+              From initial project consultation to site-visit coordination and documentation
+              guidance, they provide a personalised point of contact throughout your
               property discovery journey.
             </p>
 

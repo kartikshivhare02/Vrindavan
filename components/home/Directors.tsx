@@ -19,9 +19,9 @@ const directors = [
   },
   {
     id: "dir-2",
-    name: "Manish Jain ",
+    name: "Manish Jain",
     position: "Chairman",
-    photo: "/images/directors/manishbhaiya.jpeg",
+    photo: "/images/directors/manishbhaiya2.jpeg",
     awards: ["DAINIK BHASKAR EMINENCE AWARD 2024", "Infrastructure Excellence Award"],
     quote: "Quality is never an accident; it is always the result of intelligent effort.",
   },
