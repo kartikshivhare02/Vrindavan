@@ -1,12 +1,20 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
+
+// ─── Configuration ─────────────────────────────────────────────────────────
+const TOTAL_FRAMES = 72;
+const FRAME_PATH = (i: number) =>
+  `/hero-webp/frame_${String(i).padStart(3, "0")}.webp`;
+
+/** Smooth lerp factor — controls cinematic inertia (0.12 = responsive & velvety) */
+const LERP_FACTOR = 0.12;
 
 // ─── Hero Text Stages ────────────────────────────────────────────────────────
 interface HeroStage {
@@ -32,27 +40,27 @@ const heroStages: HeroStage[] = [
   },
   {
     startPct: 0.22,
-    endPct: 0.42,
+    endPct: 0.40,
     title: "20+ YEARS",
     subtitle: "OF TRUST & EXPERIENCE",
     body: "Creating thoughtfully planned communities and helping families find a place they can proudly call home.",
   },
   {
-    startPct: 0.46,
+    startPct: 0.44,
     endPct: 0.62,
     title: "2000+",
     subtitle: "HAPPY FAMILIES",
     body: "Thousands of families. One foundation — trust.",
   },
   {
-    startPct: 0.65,
-    endPct: 0.8,
+    startPct: 0.66,
+    endPct: 0.82,
     title: "PREMIUM\nPROJECTS",
     subtitle: "ACROSS INDORE",
     body: "Prime locations. Modern amenities. RERA-approved developments.",
   },
   {
-    startPct: 0.84,
+    startPct: 0.85,
     endPct: 1,
     title: "Your Next Address\nStarts Here.",
     ctas: [
@@ -66,20 +74,199 @@ const heroStages: HeroStage[] = [
   },
 ];
 
+// ─── Cover-crop draw helper ──────────────────────────────────────────────────
+function drawCoverFrame(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  canvasW: number,
+  canvasH: number
+) {
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  if (!imgW || !imgH) return;
+
+  const canvasAspect = canvasW / canvasH;
+  const imgAspect = imgW / imgH;
+
+  let sx = 0,
+    sy = 0,
+    sw = imgW,
+    sh = imgH;
+
+  if (imgAspect > canvasAspect) {
+    // Image is wider — crop sides
+    sw = imgH * canvasAspect;
+    sx = (imgW - sw) / 2;
+  } else {
+    // Image is taller — crop top/bottom
+    sh = imgW / canvasAspect;
+    sy = (imgH - sh) / 2;
+  }
+
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+}
+
 export default function ScrollVideoHero() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const pinContainerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollIndicatorRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const textStageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Animation refs
+  // Animation state refs (no re-renders)
   const rafRef = useRef<number | null>(null);
-  const targetProgressRef = useRef(0);
-  const currentProgressRef = useRef(0);
-  const isVideoReadyRef = useRef(false);
+  const targetFrameRef = useRef(0);
+  const currentFrameRef = useRef(0);
+  const frameCache = useRef<Map<number, HTMLImageElement>>(new Map());
+  const loadingSet = useRef<Set<number>>(new Set());
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasDims = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
+  // ── Resize canvas to match high-DPI displays ─────────────────────────────
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    ctx.scale(dpr, dpr);
+    canvasDims.current = { w, h };
+
+    const currentImg = frameCache.current.get(
+      Math.round(currentFrameRef.current)
+    );
+    if (currentImg?.complete && currentImg.naturalWidth) {
+      ctx.clearRect(0, 0, w, h);
+      drawCoverFrame(ctx, currentImg, w, h);
+    }
+  }, []);
+
+  // ── Single frame loader with memory cache ─────────────────────────────────
+  const loadFrame = useCallback(
+    (index: number, onLoad?: (img: HTMLImageElement) => void) => {
+      if (index < 0 || index >= TOTAL_FRAMES) return;
+      if (frameCache.current.has(index)) {
+        if (onLoad) onLoad(frameCache.current.get(index)!);
+        return;
+      }
+      if (loadingSet.current.has(index)) return;
+
+      loadingSet.current.add(index);
+      const img = new Image();
+      img.src = FRAME_PATH(index);
+      img.onload = () => {
+        frameCache.current.set(index, img);
+        loadingSet.current.delete(index);
+        if (onLoad) onLoad(img);
+      };
+      img.onerror = () => {
+        loadingSet.current.delete(index);
+      };
+    },
+    []
+  );
+
+  // ── Find nearest available frame (never display black/blank) ──────────────
+  const getNearestLoadedFrame = useCallback(
+    (target: number): HTMLImageElement | null => {
+      const cache = frameCache.current;
+      if (cache.has(target)) return cache.get(target)!;
+
+      for (let radius = 1; radius < TOTAL_FRAMES; radius++) {
+        if (cache.has(target - radius)) return cache.get(target - radius)!;
+        if (cache.has(target + radius)) return cache.get(target + radius)!;
+      }
+      return null;
+    },
+    []
+  );
+
+  // ── Smooth RAF render loop (lerp + canvas draw) ───────────────────────────
+  const renderLoop = useCallback(() => {
+    const target = targetFrameRef.current;
+    const current = currentFrameRef.current;
+    const diff = target - current;
+
+    if (Math.abs(diff) > 0.001) {
+      currentFrameRef.current += diff * LERP_FACTOR;
+    } else {
+      currentFrameRef.current = target;
+    }
+
+    const frameToDraw = Math.round(currentFrameRef.current);
+    const ctx = ctxRef.current;
+    const { w, h } = canvasDims.current;
+
+    if (ctx && w > 0 && h > 0) {
+      const img = getNearestLoadedFrame(frameToDraw);
+      if (img && img.complete && img.naturalWidth) {
+        ctx.clearRect(0, 0, w, h);
+        drawCoverFrame(ctx, img, w, h);
+      }
+    }
+
+    // Update progress percentage
+    const progress = currentFrameRef.current / (TOTAL_FRAMES - 1);
+    if (progressBarRef.current) {
+      progressBarRef.current.style.height = `${progress * 100}%`;
+    }
+
+    // Animate text stages with smooth sine easing, scale & blur
+    heroStages.forEach((stage, i) => {
+      const el = textStageRefs.current[i];
+      if (!el) return;
+
+      const { startPct, endPct } = stage;
+      const fadeBand = (endPct - startPct) * 0.28;
+
+      if (progress >= startPct && progress <= endPct) {
+        let opacity = 1;
+        let y = 0;
+        let scale = 1;
+        let blur = 0;
+
+        if (progress < startPct + fadeBand) {
+          // Fading in
+          const rawT = (progress - startPct) / fadeBand;
+          const t = Math.sin((rawT * Math.PI) / 2);
+          opacity = t;
+          y = (1 - t) * 30;
+          scale = 0.97 + t * 0.03;
+          blur = (1 - t) * 2.5;
+        } else if (progress > endPct - fadeBand) {
+          // Fading out
+          const rawT = (progress - (endPct - fadeBand)) / fadeBand;
+          const t = Math.sin((rawT * Math.PI) / 2);
+          opacity = 1 - t;
+          y = -t * 24;
+          scale = 1 + t * 0.02;
+          blur = t * 2.5;
+        }
+
+        el.style.opacity = `${opacity}`;
+        el.style.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
+        el.style.filter = blur > 0.1 ? `blur(${blur}px)` : "none";
+        el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
+      } else {
+        el.style.opacity = "0";
+        el.style.transform = `translate3d(0, ${progress < startPct ? 30 : -24}px, 0) scale(0.97)`;
+        el.style.filter = "none";
+        el.style.pointerEvents = "none";
+      }
+    });
+
+    rafRef.current = requestAnimationFrame(renderLoop);
+  }, [getNearestLoadedFrame]);
+
+  // ── Main effect ───────────────────────────────────────────────────────────
   useEffect(() => {
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -87,137 +274,55 @@ export default function ScrollVideoHero() {
 
     const section = sectionRef.current;
     const pinContainer = pinContainerRef.current;
-    const video = videoRef.current;
-    if (!section || !pinContainer || !video) return;
+    const canvas = canvasRef.current;
+    if (!section || !pinContainer || !canvas) return;
 
-    // Pause video so scroll controls currentTime
-    video.pause();
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+    ctxRef.current = ctx;
 
-    const handleLoadedMetadata = () => {
-      isVideoReadyRef.current = true;
-      video.currentTime = 0;
-    };
+    resizeCanvas();
 
-    if (video.readyState >= 1) {
-      handleLoadedMetadata();
-    } else {
-      video.addEventListener("loadedmetadata", handleLoadedMetadata);
-    }
-
-    if (prefersReduced) {
-      if (textStageRefs.current[0]) {
-        gsap.set(textStageRefs.current[0], { opacity: 1, y: 0 });
-      }
-      return;
-    }
-
-    // Initialize all stages
-    textStageRefs.current.forEach((el, i) => {
-      if (el) {
-        gsap.set(el, {
-          opacity: i === 0 ? 1 : 0,
-          y: i === 0 ? 0 : 40,
-          willChange: "transform, opacity",
-        });
-      }
+    // ── Phase 1: Draw frame 0 instantly on first mount ───────────────────────
+    loadFrame(0, (img) => {
+      drawCoverFrame(ctx, img, canvasDims.current.w, canvasDims.current.h);
     });
 
-    // ── Continuous RAF loop for ultra-smooth video scrubbing & text sync ──
-    const scrubLoop = () => {
-      const target = targetProgressRef.current;
-      const current = currentProgressRef.current;
-      const diff = target - current;
+    if (prefersReduced) return;
 
-      // Silky inertia damping (0.09 = cinematic velvet glide)
-      if (Math.abs(diff) > 0.0002) {
-        currentProgressRef.current += diff * 0.09;
-      } else {
-        currentProgressRef.current = target;
+    // ── Phase 2: Rapid concurrent preload of remaining 71 frames (~4 MB) ────
+    // Load in small concurrent batches so all 72 frames are in memory in <500ms
+    let nextIdx = 1;
+    const preloadTimer = setInterval(() => {
+      if (nextIdx >= TOTAL_FRAMES) {
+        clearInterval(preloadTimer);
+        return;
       }
-
-      const p = currentProgressRef.current;
-
-      // Scrub video currentTime with smooth seeking
-      if (video && video.duration && !isNaN(video.duration)) {
-        const targetTime = Math.max(
-          0,
-          Math.min(video.duration - 0.05, p * video.duration)
-        );
-        if (Math.abs(video.currentTime - targetTime) > 0.02) {
-          video.currentTime = targetTime;
-        }
+      for (let b = 0; b < 6 && nextIdx < TOTAL_FRAMES; b++, nextIdx++) {
+        loadFrame(nextIdx);
       }
+    }, 20);
 
-      // Update side progress line
-      if (progressBarRef.current) {
-        progressBarRef.current.style.height = `${p * 100}%`;
-      }
+    // ── Start RAF render loop ────────────────────────────────────────────────
+    rafRef.current = requestAnimationFrame(renderLoop);
 
-      // Animate text stages with smooth sine easing, scale & blur
-      heroStages.forEach((stage, i) => {
-        const el = textStageRefs.current[i];
-        if (!el) return;
-
-        const { startPct, endPct } = stage;
-        const fadeBand = (endPct - startPct) * 0.28;
-
-        if (p >= startPct && p <= endPct) {
-          let opacity = 1;
-          let y = 0;
-          let scale = 1;
-          let blur = 0;
-
-          if (p < startPct + fadeBand) {
-            // Fading in (smooth sine ease)
-            const rawT = (p - startPct) / fadeBand;
-            const t = Math.sin((rawT * Math.PI) / 2);
-            opacity = t;
-            y = (1 - t) * 32;
-            scale = 0.96 + t * 0.04;
-            blur = (1 - t) * 3;
-          } else if (p > endPct - fadeBand) {
-            // Fading out (smooth sine ease)
-            const rawT = (p - (endPct - fadeBand)) / fadeBand;
-            const t = Math.sin((rawT * Math.PI) / 2);
-            opacity = 1 - t;
-            y = -t * 26;
-            scale = 1 + t * 0.03;
-            blur = t * 3;
-          }
-
-          el.style.opacity = `${opacity}`;
-          el.style.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
-          el.style.filter = blur > 0.1 ? `blur(${blur}px)` : "none";
-          el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
-        } else {
-          el.style.opacity = "0";
-          el.style.transform = `translate3d(0, ${p < startPct ? 32 : -26}px, 0) scale(0.96)`;
-          el.style.filter = "none";
-          el.style.pointerEvents = "none";
-        }
-      });
-
-      rafRef.current = requestAnimationFrame(scrubLoop);
-    };
-
-    rafRef.current = requestAnimationFrame(scrubLoop);
-
-    // ── GSAP ScrollTrigger with extended travel and smooth scrub ──
-    const ctx = gsap.context(() => {
+    // ── GSAP ScrollTrigger to capture smooth scroll progress ─────────────────
+    const ctx2 = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=500%",
-        scrub: 1.0,
+        end: "+=450%",
+        scrub: 0.8,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
-          targetProgressRef.current = self.progress;
+          // Map scroll progress [0, 1] to frame index [0, 71]
+          targetFrameRef.current = self.progress * (TOTAL_FRAMES - 1);
 
           // Fade out scroll indicator gently
           if (scrollIndicatorRef.current) {
-            const indOpacity = Math.max(0, 1 - self.progress * 25);
+            const indOpacity = Math.max(0, 1 - self.progress * 20);
             scrollIndicatorRef.current.style.opacity = `${indOpacity}`;
             scrollIndicatorRef.current.style.transform = `translate3d(-50%, ${self.progress * -20}px, 0)`;
           }
@@ -225,12 +330,21 @@ export default function ScrollVideoHero() {
       });
     }, section);
 
-    return () => {
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      ctx.revert();
+    const handleResize = () => {
+      resizeCanvas();
     };
-  }, []);
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    return () => {
+      clearInterval(preloadTimer);
+      ctx2.revert();
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", handleResize);
+      frameCache.current.clear();
+      loadingSet.current.clear();
+      ctxRef.current = null;
+    };
+  }, [loadFrame, renderLoop, resizeCanvas]);
 
   return (
     <section
@@ -243,17 +357,11 @@ export default function ScrollVideoHero() {
         ref={pinContainerRef}
         className="hero-pin-wrapper relative w-full h-screen overflow-hidden bg-black"
       >
-        {/* Hardware Accelerated Background Video */}
-        <video
-          ref={videoRef}
-          src="/video/vrindavan-hero.mp4"
-          poster="/images/hero-poster.jpg"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
+        {/* Hardware-Accelerated 120FPS Canvas Frame Player */}
+        <canvas
+          ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none will-change-transform"
+          aria-hidden="true"
         />
 
         {/* Gradient Overlay for Text Legibility */}
@@ -261,7 +369,7 @@ export default function ScrollVideoHero() {
           className="absolute inset-0 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.65) 100%)",
+              "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.65) 100%)",
           }}
           aria-hidden="true"
         />
