@@ -30,7 +30,6 @@ export default function SmoothScrollProvider({
       orientation: "vertical",
       gestureOrientation: "vertical",
       smoothWheel: true,
-      wheelMultiplier: 0.9,
     });
 
     lenisRef.current = lenis;
@@ -47,25 +46,18 @@ export default function SmoothScrollProvider({
     return () => {
       gsap.ticker.remove(ticker);
       lenis.destroy();
+      lenisRef.current = null;
     };
   }, []);
 
-  // Guarantee that navigating to any page (projects, project details, home) always opens at the very top (0,0)
+  // Guarantee page opens from top (0, 0) whenever route / pathname changes
   useEffect(() => {
     if (lenisRef.current) {
       lenisRef.current.scrollTo(0, { immediate: true });
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-
-    const timer = setTimeout(() => {
-      if (lenisRef.current) {
-        lenisRef.current.scrollTo(0, { immediate: true });
-      }
-      window.scrollTo(0, 0);
-      ScrollTrigger.refresh();
-    }, 50);
-
-    return () => clearTimeout(timer);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [pathname]);
 
   return <>{children}</>;

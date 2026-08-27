@@ -1,23 +1,12 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
-
-// ─── Configuration ─────────────────────────────────────────────────────────
-const TOTAL_FRAMES = 480;
-const FRAME_PATH = (i: number) =>
-  `/hero-frames/frame_${String(i).padStart(6, "0")}.jpeg`;
-
-/** Lerp factor — controls cinematic inertia (0.12 = smooth and responsive) */
-const LERP_FACTOR = 0.14;
-
-/** How many frames to eagerly preload on initial load */
-const INITIAL_PRELOAD_COUNT = 24;
 
 // ─── Hero text stages ───────────────────────────────────────────────────────
 interface HeroStage {
@@ -56,11 +45,11 @@ const heroStages: HeroStage[] = [
     eyebrow: "OUR COMMUNITY",
     title: "2000+",
     subtitle: "HAPPY & DELIGHTED FAMILIES",
-    body: "Thousands of families have made Vrindavan their lifelong sanctuary of peace, luxury, and pride.",
+    body: "Thousands of families have made Vrindavan their lifelong sanctuary of peace and pride.",
   },
   {
     startPct: 0.68,
-    endPct: 0.84,
+    endPct: 0.85,
     eyebrow: "PRIME LANDMARKS",
     title: "PREMIUM\nTOWNSHIPS",
     subtitle: "ACROSS INDORE'S GROWTH CORRIDORS",
@@ -82,341 +71,198 @@ const heroStages: HeroStage[] = [
   },
 ];
 
-// ─── Cover-crop draw helper ──────────────────────────────────────────────────
-function drawCoverFrame(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  canvasW: number,
-  canvasH: number
-) {
-  const imgW = img.naturalWidth;
-  const imgH = img.naturalHeight;
-  if (!imgW || !imgH) return;
-
-  const canvasAspect = canvasW / canvasH;
-  const imgAspect = imgW / imgH;
-
-  let sx = 0,
-    sy = 0,
-    sw = imgW,
-    sh = imgH;
-
-  if (imgAspect > canvasAspect) {
-    sw = imgH * canvasAspect;
-    sx = (imgW - sw) / 2;
-  } else {
-    sh = imgW / canvasAspect;
-    sy = (imgH - sh) / 2;
-  }
-
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
-}
-
 export default function ScrollVideoHero() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const pinContainerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const scrollIndicatorRef = useRef<HTMLDivElement>(null);
   const textStageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Animation state refs (no re-renders)
+  // Animation state refs (prevent React re-renders)
+  const targetProgressRef = useRef(0);
+  const currentProgressRef = useRef(0);
   const rafRef = useRef<number | null>(null);
-  const targetFrameRef = useRef(0);
-  const currentFrameRef = useRef(0);
-  const frameCache = useRef<Map<number, HTMLImageElement>>(new Map());
-  const loadingSet = useRef<Set<number>>(new Set());
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const canvasDims = useRef({ w: 0, h: 0 });
 
-  // ── Canvas resize helper ───────────────────────────────────────────────────
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-    if (!canvas || !ctx) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.scale(dpr, dpr);
-
-    canvasDims.current = { w, h };
-
-    const img = frameCache.current.get(Math.round(currentFrameRef.current));
-    if (img?.complete && img.naturalWidth) {
-      ctx.clearRect(0, 0, w, h);
-      drawCoverFrame(ctx, img, w, h);
-    }
-  }, []);
-
-  // ── Frame Loader ──────────────────────────────────────────────────────────
-  const loadFrame = useCallback(
-    (index: number, onLoad?: (img: HTMLImageElement) => void) => {
-      if (index < 0 || index >= TOTAL_FRAMES) return;
-      if (frameCache.current.has(index)) {
-        const img = frameCache.current.get(index)!;
-        if (img.complete && img.naturalWidth && onLoad) {
-          onLoad(img);
-        }
-        return;
-      }
-      if (loadingSet.current.has(index)) return;
-
-      loadingSet.current.add(index);
-      const img = new window.Image();
-      img.src = FRAME_PATH(index);
-      img.onload = () => {
-        frameCache.current.set(index, img);
-        loadingSet.current.delete(index);
-        if (onLoad) onLoad(img);
-      };
-      img.onerror = () => {
-        loadingSet.current.delete(index);
-      };
-    },
-    []
-  );
-
-  // ── On-demand preload around current frame ─────────────────────────────────
-  const preloadAround = useCallback(
-    (center: number, radius: number) => {
-      for (let i = 0; i <= radius; i++) {
-        loadFrame(center + i);
-        if (i > 0) loadFrame(center - i);
-      }
-    },
-    [loadFrame]
-  );
-
-  // ── Get nearest loaded frame (zero black frames) ──────────────────────────
-  const getNearestLoadedFrame = useCallback((target: number): HTMLImageElement | null => {
-    const cache = frameCache.current;
-    if (cache.has(target)) {
-      const img = cache.get(target)!;
-      if (img.complete && img.naturalWidth) return img;
-    }
-
-    for (let radius = 1; radius < 40; radius++) {
-      const prev = cache.get(target - radius);
-      if (prev?.complete && prev.naturalWidth) return prev;
-      const next = cache.get(target + radius);
-      if (next?.complete && next.naturalWidth) return next;
-    }
-    return null;
-  }, []);
-
-  // ── RAF render loop (strictly scroll-driven) ──────────────────────────────
-  const renderLoop = useCallback(() => {
-    const ctx = ctxRef.current;
-    const { w, h } = canvasDims.current;
-
-    // Lerp currentFrame towards targetFrame (set strictly by scroll progress)
-    const diff = targetFrameRef.current - currentFrameRef.current;
-    if (Math.abs(diff) > 0.05) {
-      currentFrameRef.current += diff * LERP_FACTOR;
-    } else {
-      currentFrameRef.current = targetFrameRef.current;
-    }
-
-    const frameIdx = Math.min(
-      TOTAL_FRAMES - 1,
-      Math.max(0, Math.round(currentFrameRef.current))
-    );
-
-    const img = getNearestLoadedFrame(frameIdx);
-    if (ctx && img && w && h) {
-      ctx.clearRect(0, 0, w, h);
-      drawCoverFrame(ctx, img, w, h);
-    }
-
-    // Update progress bar
-    const progressLine = document.getElementById("hero-progress-line");
-    if (progressLine) {
-      const pct = (targetFrameRef.current / (TOTAL_FRAMES - 1)) * 100;
-      progressLine.style.height = `${pct}%`;
-    }
-
-    // Dynamic preload around current position
-    preloadAround(frameIdx, 12);
-
-    rafRef.current = requestAnimationFrame(renderLoop);
-  }, [getNearestLoadedFrame, preloadAround]);
-
-  // ── Main effect ───────────────────────────────────────────────────────────
   useEffect(() => {
     const section = sectionRef.current;
-    const canvas = canvasRef.current;
     const pinContainer = pinContainerRef.current;
-    if (!section || !canvas || !pinContainer) return;
+    const video = videoRef.current;
+    if (!section || !pinContainer) return;
 
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) return;
-    ctxRef.current = ctx;
-
-    // Initial size
-    resizeCanvas();
-
-    // Load first frame immediately
-    loadFrame(0, (img) => {
-      const { w, h } = canvasDims.current;
-      if (w && h) {
-        ctx.clearRect(0, 0, w, h);
-        drawCoverFrame(ctx, img, w, h);
-      }
-    });
-
-    // Eagerly preload initial window
-    for (let i = 1; i <= INITIAL_PRELOAD_COUNT; i++) {
-      loadFrame(i);
+    // Ensure video is paused on load — strictly scroll-driven
+    if (video) {
+      video.pause();
+      video.currentTime = 0;
     }
 
-    // Initialize text stages visibility
+    // Set initial text visibility
     textStageRefs.current.forEach((el, index) => {
       if (el) {
         gsap.set(el, { opacity: index === 0 ? 1 : 0, y: index === 0 ? 0 : 30 });
       }
     });
 
-    // Start RAF loop
+    // ── RAF render loop for buttery smooth video scrubbing & lerping ────────
+    const renderLoop = () => {
+      const vid = videoRef.current;
+      const diff = targetProgressRef.current - currentProgressRef.current;
+
+      if (Math.abs(diff) > 0.001) {
+        currentProgressRef.current += diff * 0.14;
+      } else {
+        currentProgressRef.current = targetProgressRef.current;
+      }
+
+      const progress = currentProgressRef.current;
+
+      // Scrub video to current scroll percentage
+      if (vid && vid.duration && !isNaN(vid.duration) && vid.readyState >= 2) {
+        const targetTime = Math.min(
+          vid.duration - 0.05,
+          Math.max(0, progress * vid.duration)
+        );
+        if (Math.abs(vid.currentTime - targetTime) > 0.03) {
+          vid.currentTime = targetTime;
+        }
+      }
+
+      // Update vertical progress line indicator
+      const progressLine = document.getElementById("hero-progress-line");
+      if (progressLine) {
+        progressLine.style.height = `${progress * 100}%`;
+      }
+
+      // Hide scroll down indicator after user starts scrolling
+      if (scrollIndicatorRef.current) {
+        if (progress > 0.03) {
+          gsap.to(scrollIndicatorRef.current, {
+            opacity: 0,
+            y: -15,
+            duration: 0.3,
+            overwrite: true,
+          });
+        } else {
+          gsap.to(scrollIndicatorRef.current, {
+            opacity: 1,
+            y: 0,
+            duration: 0.3,
+            overwrite: true,
+          });
+        }
+      }
+
+      // Update text stages based on progress
+      heroStages.forEach((stage, i) => {
+        const el = textStageRefs.current[i];
+        if (!el) return;
+
+        const { startPct, endPct } = stage;
+        const midFade = (endPct - startPct) * 0.16;
+
+        if (progress >= startPct && progress <= endPct) {
+          let localProgress: number;
+          if (progress < startPct + midFade) {
+            // Fade in
+            localProgress = (progress - startPct) / midFade;
+            gsap.to(el, {
+              opacity: localProgress,
+              y: (1 - localProgress) * 25,
+              duration: 0,
+            });
+          } else if (progress > endPct - midFade) {
+            // Fade out
+            localProgress = 1 - (progress - (endPct - midFade)) / midFade;
+            gsap.to(el, {
+              opacity: localProgress,
+              y: -(1 - localProgress) * 20,
+              duration: 0,
+            });
+          } else {
+            // Fully visible
+            gsap.to(el, { opacity: 1, y: 0, duration: 0 });
+          }
+        } else {
+          gsap.to(el, {
+            opacity: 0,
+            y: progress < startPct ? 25 : -20,
+            duration: 0,
+          });
+        }
+      });
+
+      rafRef.current = requestAnimationFrame(renderLoop);
+    };
+
     rafRef.current = requestAnimationFrame(renderLoop);
 
-    // GSAP ScrollTrigger: Pin section and scrub targetFrame directly with scroll
-    const ctx2 = gsap.context(() => {
+    // ── GSAP ScrollTrigger to pin section and drive progress ────────────────
+    const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=380%",
+        end: "+=350%",
         scrub: true,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
-          const progress = self.progress;
-
-          // Target frame is strictly locked to scroll progress
-          targetFrameRef.current = progress * (TOTAL_FRAMES - 1);
-
-          // Scroll indicator fade
-          if (progress > 0.03 && scrollIndicatorRef.current) {
-            gsap.to(scrollIndicatorRef.current, {
-              opacity: 0,
-              y: -15,
-              duration: 0.35,
-              overwrite: true,
-            });
-          } else if (progress <= 0.03 && scrollIndicatorRef.current) {
-            gsap.to(scrollIndicatorRef.current, {
-              opacity: 1,
-              y: 0,
-              duration: 0.35,
-              overwrite: true,
-            });
-          }
-
-          // Text stages transition based on scroll position
-          heroStages.forEach((stage, i) => {
-            const el = textStageRefs.current[i];
-            if (!el) return;
-
-            const { startPct, endPct } = stage;
-            const midFade = (endPct - startPct) * 0.18;
-
-            if (progress >= startPct && progress <= endPct) {
-              let localProgress: number;
-              if (progress < startPct + midFade) {
-                // Fade in
-                localProgress = (progress - startPct) / midFade;
-                gsap.to(el, {
-                  opacity: localProgress,
-                  y: (1 - localProgress) * 25,
-                  duration: 0,
-                });
-              } else if (progress > endPct - midFade) {
-                // Fade out
-                localProgress = 1 - (progress - (endPct - midFade)) / midFade;
-                gsap.to(el, {
-                  opacity: localProgress,
-                  y: -(1 - localProgress) * 20,
-                  duration: 0,
-                });
-              } else {
-                // Fully visible
-                gsap.to(el, { opacity: 1, y: 0, duration: 0 });
-              }
-            } else {
-              gsap.to(el, {
-                opacity: 0,
-                y: progress < startPct ? 25 : -20,
-                duration: 0,
-              });
-            }
-          });
+          targetProgressRef.current = self.progress;
         },
       });
     }, section);
 
-    // Resize listener
-    const handleResize = () => {
-      resizeCanvas();
-    };
-    window.addEventListener("resize", handleResize, { passive: true });
-
     return () => {
-      ctx2.revert();
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", handleResize);
-      frameCache.current.clear();
-      loadingSet.current.clear();
-      ctxRef.current = null;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      ctx.revert();
     };
-  }, [loadFrame, renderLoop, resizeCanvas]);
+  }, []);
 
   return (
     <section
       ref={sectionRef}
       className="relative w-full min-h-screen bg-[#0A0A0A]"
       id="hero"
-      aria-label="Vrindavan Group — Scroll Controlled Hero"
+      aria-label="Vrindavan Group — Scroll-Controlled Hero"
     >
       <div
         ref={pinContainerRef}
         className="hero-pin-wrapper relative w-full h-screen overflow-hidden bg-[#0A0A0A]"
       >
-        {/* Canvas — strictly scroll-controlled frame sequence */}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full object-cover z-0"
+        {/* Scroll-Scrubbed Video — Strictly driven by user scroll */}
+        <video
+          ref={videoRef}
+          src="/video/vrindavan-hero.mp4"
+          poster="/hero-frames/frame_000000.jpeg"
+          muted
+          playsInline
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover z-0 pointer-events-none"
+          style={{ willChange: "transform" }}
           aria-hidden="true"
         />
 
-        {/* Cinematic dark gradient overlay */}
+        {/* Cinematic dark gradient overlay for optimal readability */}
         <div
           className="absolute inset-0 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(135deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0.25) 40%, rgba(10,10,10,0.65) 100%)",
+              "linear-gradient(135deg, rgba(10,10,10,0.58) 0%, rgba(10,10,10,0.35) 40%, rgba(10,10,10,0.68) 100%)",
           }}
           aria-hidden="true"
         />
 
         {/* Bottom feather vignette into next section */}
         <div
-          className="absolute bottom-0 left-0 right-0 h-40 z-10 pointer-events-none"
+          className="absolute bottom-0 left-0 right-0 h-36 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(to top, #F8F5F0 0%, rgba(248,245,240,0.4) 40%, transparent 100%)",
+              "linear-gradient(to top, #F8F5F0 0%, rgba(248,245,240,0.3) 50%, transparent 100%)",
           }}
           aria-hidden="true"
         />
 
-        {/* Text Overlay Stage */}
+        {/* Interactive Text Overlay Stage */}
         <div
-          ref={overlayRef}
           className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
           aria-live="polite"
         >
@@ -461,7 +307,9 @@ export default function ScrollVideoHero() {
 
                   {/* Body */}
                   {stage.body && (
-                    <p className="font-body text-white/80 leading-relaxed max-w-xl mb-6 text-sm md:text-base drop-shadow">
+                    <p
+                      className="font-body text-white/80 leading-relaxed max-w-xl mb-6 text-sm md:text-base drop-shadow"
+                    >
                       {stage.body}
                     </p>
                   )}
@@ -528,7 +376,7 @@ export default function ScrollVideoHero() {
             <div className="w-1 h-1.5 bg-[#c9a84c] rounded-full animate-bounce" />
           </div>
           <p className="font-body text-white/50 text-[10px] tracking-[0.25em] uppercase">
-            Scroll to Scrub
+            Scroll to Explore
           </p>
         </div>
       </div>
