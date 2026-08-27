@@ -23,11 +23,13 @@ export default function SmoothScrollProvider({
     if (prefersReduced) return;
 
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.0,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: "vertical",
       gestureOrientation: "vertical",
       smoothWheel: true,
+      wheelMultiplier: 1.0,
+      touchMultiplier: 1.5,
     });
 
     lenisRef.current = lenis;
@@ -35,14 +37,15 @@ export default function SmoothScrollProvider({
     // Sync Lenis with GSAP ScrollTrigger
     lenis.on("scroll", ScrollTrigger.update);
 
-    const ticker = gsap.ticker.add((time) => {
+    const updateTicker = (time: number) => {
       lenis.raf(time * 1000);
-    });
+    };
 
-    gsap.ticker.lagSmoothing(0);
+    gsap.ticker.add(updateTicker);
+    gsap.ticker.lagSmoothing(500, 33);
 
     return () => {
-      gsap.ticker.remove(ticker);
+      gsap.ticker.remove(updateTicker);
       lenis.destroy();
     };
   }, []);
