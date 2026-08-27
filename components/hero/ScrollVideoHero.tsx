@@ -128,22 +128,22 @@ export default function ScrollVideoHero() {
       const current = currentProgressRef.current;
       const diff = target - current;
 
-      if (Math.abs(diff) > 0.0005) {
-        currentProgressRef.current += diff * 0.15;
+      // Silky inertia damping (0.09 = cinematic velvet glide)
+      if (Math.abs(diff) > 0.0002) {
+        currentProgressRef.current += diff * 0.09;
       } else {
         currentProgressRef.current = target;
       }
 
       const p = currentProgressRef.current;
 
-      // Scrub video currentTime
+      // Scrub video currentTime with smooth seeking
       if (video && video.duration && !isNaN(video.duration)) {
         const targetTime = Math.max(
           0,
           Math.min(video.duration - 0.05, p * video.duration)
         );
-        // Only update if difference is meaningful to prevent micro-jank
-        if (Math.abs(video.currentTime - targetTime) > 0.03) {
+        if (Math.abs(video.currentTime - targetTime) > 0.02) {
           video.currentTime = targetTime;
         }
       }
@@ -153,36 +153,47 @@ export default function ScrollVideoHero() {
         progressBarRef.current.style.height = `${p * 100}%`;
       }
 
-      // Animate text stages
+      // Animate text stages with smooth sine easing, scale & blur
       heroStages.forEach((stage, i) => {
         const el = textStageRefs.current[i];
         if (!el) return;
 
         const { startPct, endPct } = stage;
-        const fadeBand = (endPct - startPct) * 0.22;
+        const fadeBand = (endPct - startPct) * 0.28;
 
         if (p >= startPct && p <= endPct) {
           let opacity = 1;
           let y = 0;
+          let scale = 1;
+          let blur = 0;
 
           if (p < startPct + fadeBand) {
-            // Fading in
-            const t = (p - startPct) / fadeBand;
+            // Fading in (smooth sine ease)
+            const rawT = (p - startPct) / fadeBand;
+            const t = Math.sin((rawT * Math.PI) / 2);
             opacity = t;
-            y = (1 - t) * 28;
+            y = (1 - t) * 32;
+            scale = 0.96 + t * 0.04;
+            blur = (1 - t) * 3;
           } else if (p > endPct - fadeBand) {
-            // Fading out
-            const t = (p - (endPct - fadeBand)) / fadeBand;
+            // Fading out (smooth sine ease)
+            const rawT = (p - (endPct - fadeBand)) / fadeBand;
+            const t = Math.sin((rawT * Math.PI) / 2);
             opacity = 1 - t;
-            y = -t * 22;
+            y = -t * 26;
+            scale = 1 + t * 0.03;
+            blur = t * 3;
           }
 
-          gsap.set(el, { opacity, y });
+          el.style.opacity = `${opacity}`;
+          el.style.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
+          el.style.filter = blur > 0.1 ? `blur(${blur}px)` : "none";
+          el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
         } else {
-          gsap.set(el, {
-            opacity: 0,
-            y: p < startPct ? 30 : -20,
-          });
+          el.style.opacity = "0";
+          el.style.transform = `translate3d(0, ${p < startPct ? 32 : -26}px, 0) scale(0.96)`;
+          el.style.filter = "none";
+          el.style.pointerEvents = "none";
         }
       });
 
@@ -191,27 +202,24 @@ export default function ScrollVideoHero() {
 
     rafRef.current = requestAnimationFrame(scrubLoop);
 
-    // ── GSAP ScrollTrigger to capture scroll position ──
+    // ── GSAP ScrollTrigger with extended travel and smooth scrub ──
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=380%",
-        scrub: 0.5,
+        end: "+=500%",
+        scrub: 1.0,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
           targetProgressRef.current = self.progress;
 
-          // Fade out scroll indicator
+          // Fade out scroll indicator gently
           if (scrollIndicatorRef.current) {
-            gsap.to(scrollIndicatorRef.current, {
-              opacity: self.progress > 0.03 ? 0 : 1,
-              y: self.progress > 0.03 ? -10 : 0,
-              duration: 0.3,
-              overwrite: true,
-            });
+            const indOpacity = Math.max(0, 1 - self.progress * 25);
+            scrollIndicatorRef.current.style.opacity = `${indOpacity}`;
+            scrollIndicatorRef.current.style.transform = `translate3d(-50%, ${self.progress * -20}px, 0)`;
           }
         },
       });
