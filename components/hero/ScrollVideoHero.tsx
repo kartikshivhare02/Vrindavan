@@ -9,12 +9,21 @@ import { ArrowRight } from "lucide-react";
 gsap.registerPlugin(ScrollTrigger);
 
 // ─── Configuration ─────────────────────────────────────────────────────────
-const TOTAL_FRAMES = 72;
-const FRAME_PATH = (i: number) =>
-  `/hero-webp/frame_${String(i).padStart(3, "0")}.webp`;
+// Adjust these values to tune the animation
+const TOTAL_FRAMES = 480;         // Total number of frames in the sequence
+const SCROLL_LENGTH = "+=500%";   // Height of the sticky scroll section (400%-700%)
+const LERP_FACTOR = 0.12;         // Cinematic inertia (lower = smoother but laggier)
+const PRELOAD_BATCH_SIZE = 10;    // Frames loaded per batch (larger = faster fill, frames are now smaller)
+const PRELOAD_BATCH_INTERVAL = 25; // ms between batches
+const NEAR_RADIUS = 30;           // Priority preload radius around current frame
 
-/** Smooth lerp factor — controls cinematic inertia (0.12 = responsive & velvety) */
-const LERP_FACTOR = 0.12;
+// Desktop: public/frames/desktop/ — q75/effort6, full 1280×720 (~28 MB total)
+// Mobile:  public/frames/mobile/  — q65/effort6, 720px wide  (~12 MB total)
+// Mobile sequence serves viewports ≤768px
+const FRAME_PATH_DESKTOP = (i: number) =>
+  `/frames/desktop/frame_${String(i).padStart(4, "0")}.webp`;
+const FRAME_PATH_MOBILE = (i: number) =>
+  `/frames/mobile/frame_${String(i).padStart(4, "0")}.webp`;
 
 // ─── Hero Text Stages ────────────────────────────────────────────────────────
 interface HeroStage {
@@ -77,21 +86,18 @@ const heroStages: HeroStage[] = [
 // ─── Cover-crop draw helper ──────────────────────────────────────────────────
 function drawCoverFrame(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | ImageBitmap,
   canvasW: number,
   canvasH: number
 ) {
-  const imgW = img.naturalWidth;
-  const imgH = img.naturalHeight;
+  const imgW = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+  const imgH = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
   if (!imgW || !imgH) return;
 
   const canvasAspect = canvasW / canvasH;
   const imgAspect = imgW / imgH;
 
-  let sx = 0,
-    sy = 0,
-    sw = imgW,
-    sh = imgH;
+  let sx = 0, sy = 0, sw = imgW, sh = imgH;
 
   if (imgAspect > canvasAspect) {
     // Image is wider — crop sides
@@ -103,97 +109,151 @@ function drawCoverFrame(
     sy = (imgH - sh) / 2;
   }
 
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+  ctx.drawImage(img as CanvasImageSource, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
+}
+
+// ─── Detect mobile for adaptive quality ──────────────────────────────────────
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth <= 768;
 }
 
 export default function ScrollVideoHero() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const pinContainerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sectionRef        = useRef<HTMLDivElement>(null);
+  const pinContainerRef   = useRef<HTMLDivElement>(null);
+  const canvasRef         = useRef<HTMLCanvasElement>(null);
   const scrollIndicatorRef = useRef<HTMLDivElement>(null);
-  const progressBarRef = useRef<HTMLDivElement>(null);
-  const textStageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const progressBarRef    = useRef<HTMLDivElement>(null);
+  const textStageRefs     = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Animation state refs (no re-renders)
-  const rafRef = useRef<number | null>(null);
-  const targetFrameRef = useRef(0);
+  // Animation state (no re-renders)
+  const rafRef          = useRef<number | null>(null);
+  const targetFrameRef  = useRef(0);
   const currentFrameRef = useRef(0);
-  const frameCache = useRef<Map<number, HTMLImageElement>>(new Map());
-  const loadingSet = useRef<Set<number>>(new Set());
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const canvasDims = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+  const lastDrawnFrame  = useRef(-1);
 
-  // ── Resize canvas to match high-DPI displays ─────────────────────────────
+  // Dual caches: HTMLImageElement (fallback) + ImageBitmap (when available)
+  const imageCache  = useRef<Map<number, HTMLImageElement>>(new Map());
+  const bitmapCache = useRef<Map<number, ImageBitmap>>(new Map());
+  const loadingSet  = useRef<Set<number>>(new Set());
+
+  const ctxRef      = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasDims  = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+  const isMobile    = useRef(false);
+  const sectionInView = useRef(false);
+
+  // Path selector based on viewport at mount time
+  const framePath = useCallback((i: number) => {
+    return isMobile.current ? FRAME_PATH_MOBILE(i) : FRAME_PATH_DESKTOP(i);
+  }, []);
+
+  // ── Resize canvas to match high-DPI displays ──────────────────────────────
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
+    const ctx    = ctxRef.current;
     if (!canvas || !ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w   = window.innerWidth;
+    const h   = window.innerHeight;
 
-    canvas.width = w * dpr;
+    canvas.width  = w * dpr;
     canvas.height = h * dpr;
-    canvas.style.width = `${w}px`;
+    canvas.style.width  = `${w}px`;
     canvas.style.height = `${h}px`;
     ctx.scale(dpr, dpr);
     canvasDims.current = { w, h };
 
-    const currentImg = frameCache.current.get(
-      Math.round(currentFrameRef.current)
-    );
-    if (currentImg?.complete && currentImg.naturalWidth) {
+    // Redraw current frame after resize
+    const fn = Math.round(currentFrameRef.current);
+    const bmp = bitmapCache.current.get(fn);
+    const img = imageCache.current.get(fn);
+    const src = bmp ?? img;
+    if (src) {
       ctx.clearRect(0, 0, w, h);
-      drawCoverFrame(ctx, currentImg, w, h);
+      drawCoverFrame(ctx, src as HTMLImageElement | ImageBitmap, w, h);
     }
   }, []);
 
-  // ── Single frame loader with memory cache ─────────────────────────────────
+  // ── Load a frame with optional ImageBitmap upgrade ───────────────────────
   const loadFrame = useCallback(
     (index: number, onLoad?: (img: HTMLImageElement) => void) => {
       if (index < 0 || index >= TOTAL_FRAMES) return;
-      if (frameCache.current.has(index)) {
-        if (onLoad) onLoad(frameCache.current.get(index)!);
+      if (imageCache.current.has(index)) {
+        if (onLoad) onLoad(imageCache.current.get(index)!);
         return;
       }
       if (loadingSet.current.has(index)) return;
 
       loadingSet.current.add(index);
       const img = new Image();
-      img.src = FRAME_PATH(index);
+      img.src = framePath(index);
+      img.decoding = "async";
+
       img.onload = () => {
-        frameCache.current.set(index, img);
+        imageCache.current.set(index, img);
         loadingSet.current.delete(index);
+
+        // Optionally upgrade to ImageBitmap for zero-copy GPU rendering
+        // Tradeoff: faster draw() but uses extra GPU memory; skip on mobile
+        if (!isMobile.current && typeof createImageBitmap === "function") {
+          createImageBitmap(img, { resizeQuality: "high" })
+            .then((bmp) => bitmapCache.current.set(index, bmp))
+            .catch(() => {}); // silently fall back to img
+        }
+
         if (onLoad) onLoad(img);
       };
+
       img.onerror = () => {
         loadingSet.current.delete(index);
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`[ScrollVideoHero] Missing frame: ${img.src}`);
+        }
       };
     },
-    []
+    [framePath]
   );
 
-  // ── Find nearest available frame (never display black/blank) ──────────────
+  // ── Find nearest available frame (never display blank) ────────────────────
   const getNearestLoadedFrame = useCallback(
-    (target: number): HTMLImageElement | null => {
-      const cache = frameCache.current;
-      if (cache.has(target)) return cache.get(target)!;
+    (target: number): HTMLImageElement | ImageBitmap | null => {
+      // Prefer ImageBitmap if available (faster draw)
+      if (bitmapCache.current.has(target)) return bitmapCache.current.get(target)!;
+      if (imageCache.current.has(target)) return imageCache.current.get(target)!;
 
       for (let radius = 1; radius < TOTAL_FRAMES; radius++) {
-        if (cache.has(target - radius)) return cache.get(target - radius)!;
-        if (cache.has(target + radius)) return cache.get(target + radius)!;
+        const lo = target - radius;
+        const hi = target + radius;
+        if (bitmapCache.current.has(lo)) return bitmapCache.current.get(lo)!;
+        if (imageCache.current.has(lo)) return imageCache.current.get(lo)!;
+        if (bitmapCache.current.has(hi)) return bitmapCache.current.get(hi)!;
+        if (imageCache.current.has(hi)) return imageCache.current.get(hi)!;
       }
       return null;
     },
     []
   );
 
-  // ── Smooth RAF render loop (lerp + canvas draw) ───────────────────────────
+  // ── Priority frame preloader: loads frames closest to current first ───────
+  const schedulePriorityLoad = useCallback(
+    (center: number) => {
+      const toLoad: number[] = [];
+      for (let r = 1; r <= NEAR_RADIUS; r++) {
+        const lo = center - r;
+        const hi = center + r;
+        if (lo >= 0 && lo < TOTAL_FRAMES && !imageCache.current.has(lo) && !loadingSet.current.has(lo)) toLoad.push(lo);
+        if (hi >= 0 && hi < TOTAL_FRAMES && !imageCache.current.has(hi) && !loadingSet.current.has(hi)) toLoad.push(hi);
+      }
+      toLoad.forEach((idx) => loadFrame(idx));
+    },
+    [loadFrame]
+  );
+
+  // ── Smooth RAF render loop ────────────────────────────────────────────────
   const renderLoop = useCallback(() => {
-    const target = targetFrameRef.current;
+    const target  = targetFrameRef.current;
     const current = currentFrameRef.current;
-    const diff = target - current;
+    const diff    = target - current;
 
     if (Math.abs(diff) > 0.001) {
       currentFrameRef.current += diff * LERP_FACTOR;
@@ -205,21 +265,23 @@ export default function ScrollVideoHero() {
     const ctx = ctxRef.current;
     const { w, h } = canvasDims.current;
 
-    if (ctx && w > 0 && h > 0) {
-      const img = getNearestLoadedFrame(frameToDraw);
-      if (img && img.complete && img.naturalWidth) {
+    // Only redraw when the calculated frame index actually changes
+    if (ctx && w > 0 && h > 0 && frameToDraw !== lastDrawnFrame.current) {
+      const src = getNearestLoadedFrame(frameToDraw);
+      if (src) {
         ctx.clearRect(0, 0, w, h);
-        drawCoverFrame(ctx, img, w, h);
+        drawCoverFrame(ctx, src as HTMLImageElement | ImageBitmap, w, h);
+        lastDrawnFrame.current = frameToDraw;
       }
     }
 
-    // Update progress percentage
+    // Update left-side progress indicator
     const progress = currentFrameRef.current / (TOTAL_FRAMES - 1);
     if (progressBarRef.current) {
       progressBarRef.current.style.height = `${progress * 100}%`;
     }
 
-    // Animate text stages with smooth sine easing, scale & blur
+    // Animate text stages (sine easing, scale & blur)
     heroStages.forEach((stage, i) => {
       const el = textStageRefs.current[i];
       if (!el) return;
@@ -228,27 +290,16 @@ export default function ScrollVideoHero() {
       const fadeBand = (endPct - startPct) * 0.28;
 
       if (progress >= startPct && progress <= endPct) {
-        let opacity = 1;
-        let y = 0;
-        let scale = 1;
-        let blur = 0;
+        let opacity = 1, y = 0, scale = 1, blur = 0;
 
         if (progress < startPct + fadeBand) {
-          // Fading in
           const rawT = (progress - startPct) / fadeBand;
           const t = Math.sin((rawT * Math.PI) / 2);
-          opacity = t;
-          y = (1 - t) * 30;
-          scale = 0.97 + t * 0.03;
-          blur = (1 - t) * 2.5;
+          opacity = t; y = (1 - t) * 30; scale = 0.97 + t * 0.03; blur = (1 - t) * 2.5;
         } else if (progress > endPct - fadeBand) {
-          // Fading out
           const rawT = (progress - (endPct - fadeBand)) / fadeBand;
           const t = Math.sin((rawT * Math.PI) / 2);
-          opacity = 1 - t;
-          y = -t * 24;
-          scale = 1 + t * 0.02;
-          blur = t * 2.5;
+          opacity = 1 - t; y = -t * 24; scale = 1 + t * 0.02; blur = t * 2.5;
         }
 
         el.style.opacity = `${opacity}`;
@@ -268,83 +319,124 @@ export default function ScrollVideoHero() {
 
   // ── Main effect ───────────────────────────────────────────────────────────
   useEffect(() => {
-    const prefersReduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const section = sectionRef.current;
+    const section      = sectionRef.current;
     const pinContainer = pinContainerRef.current;
-    const canvas = canvasRef.current;
+    const canvas       = canvasRef.current;
     if (!section || !pinContainer || !canvas) return;
 
-    const ctx = canvas.getContext("2d", { alpha: false });
+    // Detect mobile once at mount
+    isMobile.current = isMobileViewport();
+
+    const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: false });
     if (!ctx) return;
     ctxRef.current = ctx;
 
     resizeCanvas();
 
-    // ── Phase 1: Draw frame 0 instantly on first mount ───────────────────────
+    // Phase 1: Load frame 0 instantly — highest priority
     loadFrame(0, (img) => {
       drawCoverFrame(ctx, img, canvasDims.current.w, canvasDims.current.h);
+      lastDrawnFrame.current = 0;
     });
 
-    if (prefersReduced) return;
+    if (prefersReduced) {
+      // Accessibility: static first frame only, no scroll animation
+      return;
+    }
 
-    // ── Phase 2: Rapid concurrent preload of remaining 71 frames (~4 MB) ────
-    // Load in small concurrent batches so all 72 frames are in memory in <500ms
-    let nextIdx = 1;
-    const preloadTimer = setInterval(() => {
-      if (nextIdx >= TOTAL_FRAMES) {
-        clearInterval(preloadTimer);
-        return;
-      }
-      for (let b = 0; b < 6 && nextIdx < TOTAL_FRAMES; b++, nextIdx++) {
-        loadFrame(nextIdx);
-      }
-    }, 20);
+    // Phase 2: Preload first ~30 frames immediately for fast initial scroll
+    for (let i = 1; i <= 30 && i < TOTAL_FRAMES; i++) loadFrame(i);
 
-    // ── Start RAF render loop ────────────────────────────────────────────────
+    // Phase 3: Progressive batch load of remaining frames
+    let nextBatchIdx = 31;
+    let batchTimer: ReturnType<typeof setInterval> | null = null;
+
+    function startBatchLoad() {
+      if (batchTimer) return;
+      batchTimer = setInterval(() => {
+        if (nextBatchIdx >= TOTAL_FRAMES) {
+          if (batchTimer) clearInterval(batchTimer);
+          batchTimer = null;
+          return;
+        }
+        for (let b = 0; b < PRELOAD_BATCH_SIZE && nextBatchIdx < TOTAL_FRAMES; b++, nextBatchIdx++) {
+          loadFrame(nextBatchIdx);
+        }
+      }, PRELOAD_BATCH_INTERVAL);
+    }
+
+    // Phase 4: IntersectionObserver — start aggressive loading when near viewport
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          sectionInView.current = entry.isIntersecting;
+          if (entry.isIntersecting) {
+            startBatchLoad();
+          }
+        });
+      },
+      { rootMargin: "400px 0px" } // Start loading 400px before it enters viewport
+    );
+    observer.observe(section);
+
+    // Start batch load immediately (observer fires when already in view)
+    startBatchLoad();
+
+    // Phase 5: Start RAF render loop
     rafRef.current = requestAnimationFrame(renderLoop);
 
-    // ── GSAP ScrollTrigger to capture smooth scroll progress ─────────────────
-    const ctx2 = gsap.context(() => {
+    // Phase 6: GSAP ScrollTrigger for pinning + scroll progress
+    const gsapCtx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: section,
         pin: pinContainer,
         start: "top top",
-        end: "+=450%",
+        end: SCROLL_LENGTH,
         scrub: 0.8,
         pinSpacing: true,
         anticipatePin: 1,
         onUpdate: (self) => {
-          // Map scroll progress [0, 1] to frame index [0, 71]
+          // Map scroll progress [0,1] → frame index [0, TOTAL_FRAMES-1]
           targetFrameRef.current = self.progress * (TOTAL_FRAMES - 1);
 
-          // Fade out scroll indicator gently
+          // Load priority frames near current scroll position
+          const centerFrame = Math.round(self.progress * (TOTAL_FRAMES - 1));
+          schedulePriorityLoad(centerFrame);
+
+          // Fade out scroll indicator
           if (scrollIndicatorRef.current) {
             const indOpacity = Math.max(0, 1 - self.progress * 20);
             scrollIndicatorRef.current.style.opacity = `${indOpacity}`;
-            scrollIndicatorRef.current.style.transform = `translate3d(-50%, ${self.progress * -20}px, 0)`;
+            scrollIndicatorRef.current.style.transform =
+              `translate3d(-50%, ${self.progress * -20}px, 0)`;
           }
         },
       });
     }, section);
 
+    // Resize handler
     const handleResize = () => {
+      isMobile.current = isMobileViewport();
       resizeCanvas();
     };
     window.addEventListener("resize", handleResize, { passive: true });
 
     return () => {
-      clearInterval(preloadTimer);
-      ctx2.revert();
+      if (batchTimer) clearInterval(batchTimer);
+      gsapCtx.revert();
+      observer.disconnect();
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", handleResize);
-      frameCache.current.clear();
+      // Clear caches
+      bitmapCache.current.forEach((bmp) => bmp.close());
+      bitmapCache.current.clear();
+      imageCache.current.clear();
       loadingSet.current.clear();
       ctxRef.current = null;
     };
-  }, [loadFrame, renderLoop, resizeCanvas]);
+  }, [loadFrame, renderLoop, resizeCanvas, schedulePriorityLoad]);
 
   return (
     <section
@@ -357,7 +449,7 @@ export default function ScrollVideoHero() {
         ref={pinContainerRef}
         className="hero-pin-wrapper relative w-full h-screen overflow-hidden bg-black"
       >
-        {/* Hardware-Accelerated 120FPS Canvas Frame Player */}
+        {/* Hardware-Accelerated Canvas Frame Player */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none will-change-transform"
@@ -393,13 +485,9 @@ export default function ScrollVideoHero() {
             {heroStages.map((stage, i) => (
               <div
                 key={i}
-                ref={(el) => {
-                  textStageRefs.current[i] = el;
-                }}
+                ref={(el) => { textStageRefs.current[i] = el; }}
                 className="absolute inset-0 flex items-center"
-                style={{
-                  pointerEvents: "auto",
-                }}
+                style={{ pointerEvents: "auto" }}
               >
                 <div className="max-w-3xl">
                   {/* Eyebrow */}
@@ -412,9 +500,7 @@ export default function ScrollVideoHero() {
                   {/* Main Title */}
                   <h1
                     className="font-heading font-bold text-white leading-[0.95] mb-4 whitespace-pre-line text-shadow-sm"
-                    style={{
-                      fontSize: "clamp(2.75rem, 7.5vw, 6.5rem)",
-                    }}
+                    style={{ fontSize: "clamp(2.75rem, 7.5vw, 6.5rem)" }}
                   >
                     {stage.title}
                   </h1>
@@ -447,9 +533,7 @@ export default function ScrollVideoHero() {
                           key={ci}
                           href={cta.href}
                           className={`btn-base ${
-                            cta.variant === "primary"
-                              ? "btn-gold"
-                              : "btn-outline-white"
+                            cta.variant === "primary" ? "btn-gold" : "btn-outline-white"
                           } group shadow-lg`}
                           id={`hero-cta-${i}-${ci}`}
                         >
