@@ -489,7 +489,7 @@ export default function ScrollVideoHero() {
                 className="absolute inset-0 flex items-center"
                 style={{ pointerEvents: "auto" }}
               >
-                <div className="max-w-3xl">
+                <div className="max-w-3xl px-1 sm:px-0">
                   {/* Eyebrow */}
                   {stage.eyebrow && (
                     <p className="font-body text-xs md:text-sm font-medium tracking-[0.3em] text-brand-gold mb-3 uppercase">
@@ -500,7 +500,7 @@ export default function ScrollVideoHero() {
                   {/* Main Title */}
                   <h1
                     className="font-heading font-bold text-white leading-[0.95] mb-4 whitespace-pre-line text-shadow-sm"
-                    style={{ fontSize: "clamp(2.75rem, 7.5vw, 6.5rem)" }}
+                    style={{ fontSize: "clamp(2.2rem, 7.5vw, 6.5rem)" }}
                   >
                     {stage.title}
                   </h1>
@@ -527,7 +527,7 @@ export default function ScrollVideoHero() {
 
                   {/* CTAs */}
                   {stage.ctas && stage.ctas.length > 0 && (
-                    <div className="flex flex-wrap gap-4 mt-6">
+                    <div className="flex flex-wrap gap-3 mt-5">
                       {stage.ctas.map((cta, ci) => (
                         <Link
                           key={ci}

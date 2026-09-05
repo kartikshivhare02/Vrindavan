@@ -184,7 +184,7 @@ export default function Directors() {
         </div>
 
         <div
-          className="mt-12 grid grid-cols-2 md:grid-cols-5 gap-4"
+          className="mt-12 grid grid-cols-3 md:grid-cols-5 gap-4"
           aria-label="Company achievements"
         >
           {[

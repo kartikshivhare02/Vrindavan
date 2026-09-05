@@ -61,6 +61,9 @@ html {
   scroll-behavior: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* prevent horizontal scroll at root level */
+  /* Ensure full width is always respected */
+  width: 100%;
 }
 
 body {
@@ -68,6 +71,8 @@ body {
   background-color: var(--page-bg);
   color: var(--charcoal);
   overflow-x: hidden;
+  width: 100%;
+  min-width: 0;
   font-size: 16px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
@@ -136,14 +141,14 @@ body {
   width: 100%;
   max-width: 1440px;
   margin-inline: auto;
-  padding-inline: clamp(1.25rem, 4vw, 5rem);
+  padding-inline: clamp(1rem, 5vw, 5rem);
 }
 
 .container-narrow {
   width: 100%;
   max-width: 1200px;
   margin-inline: auto;
-  padding-inline: clamp(1.25rem, 4vw, 5rem);
+  padding-inline: clamp(1rem, 5vw, 5rem);
 }
 
 /* ── Section Label (eyebrow) ──────────────────────────────────────────────── */
@@ -384,6 +389,42 @@ body {
   #lifestyle .grid > div:nth-child(5),
   #lifestyle .grid > div:nth-child(6) {
     border-bottom: 1px solid rgba(201,168,76,0.15) !important;
+  }
+}
+
+/* ── Mobile-specific fixes ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Ensure nothing overflows on very small phones */
+  * { max-width: 100%; }
+  img, video, canvas { max-width: 100%; height: auto; }
+
+  /* Hero text — tighter on phone */
+  .hero-pin-wrapper .max-w-3xl {
+    padding-inline: 1.25rem;
+    max-width: 100%;
+  }
+
+  /* About stats: 2 columns on small phones instead of 4 */
+  .about-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Project cards — full width snap on tiny screens */
+  .projects-scroll-inner {
+    gap: 1rem !important;
+  }
+
+  /* Footer bottom bar: stack all items */
+  .footer-bottom-bar {
+    flex-direction: column !important;
+    text-align: center;
+    gap: 0.75rem !important;
+  }
+
+  /* Navbar logo shrink on tiny screens */
+  .navbar-logo-wrap {
+    width: 120px !important;
+    height: 38px !important;
   }
 }
 

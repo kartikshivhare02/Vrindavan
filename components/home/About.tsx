@@ -201,7 +201,7 @@ export default function About() {
 
             {/* Stats row */}
             <div
-              className="reveal-el grid grid-cols-4 gap-0 overflow-hidden"
+              className="reveal-el about-stats-grid grid grid-cols-2 sm:grid-cols-4 gap-0 overflow-hidden"
               style={{ borderTop: "1px solid rgba(201,168,76,0.12)", borderBottom: "1px solid rgba(201,168,76,0.12)", borderLeft: "1px solid rgba(201,168,76,0.12)" }}
             >
               {stats.map((stat, i) => (

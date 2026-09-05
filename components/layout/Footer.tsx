@@ -239,7 +239,7 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="container-wide py-6 flex flex-col md:flex-row items-center justify-between gap-4"
+        <div className="container-wide py-6 footer-bottom-bar flex flex-col sm:flex-row items-center justify-between gap-4"
           style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}
         >
           <p>© {currentYear} {siteConfig.companyName}. All Rights Reserved.</p>

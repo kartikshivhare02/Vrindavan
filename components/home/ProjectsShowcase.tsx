@@ -10,7 +10,7 @@ import { projects } from "@/data/projects";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const CARD_WIDTH = 280; // px
+const CARD_WIDTH = 280; // px — desktop/tablet
 
 export default function ProjectsShowcase() {
   const sectionRef   = useRef<HTMLDivElement>(null);
@@ -99,7 +99,7 @@ export default function ProjectsShowcase() {
         {/* ── Horizontal scroll strip ── */}
         <div
           ref={scrollRef}
-          className="opacity-0"
+          className="opacity-0 projects-scroll-inner"
           style={{
             display: "flex",
             gap: "1.25rem",
@@ -108,6 +108,7 @@ export default function ProjectsShowcase() {
             scrollbarWidth: "none",
             msOverflowStyle: "none",
             paddingBottom: "0.5rem",
+            WebkitOverflowScrolling: "touch",
           }}
           role="list"
           aria-label="Project cards"
@@ -121,7 +122,7 @@ export default function ProjectsShowcase() {
               aria-label={`View ${project.name}`}
               className="group flex-shrink-0"
               style={{
-                width: `${CARD_WIDTH}px`,
+                width: `min(${CARD_WIDTH}px, 82vw)`,
                 scrollSnapAlign: "start",
                 display: "block",
                 textDecoration: "none",
