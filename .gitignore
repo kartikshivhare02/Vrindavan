@@ -40,7 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Frame animation assets — serve these from a CDN, not git
-# Run: node scripts/convert-frames.js to regenerate locally
-/public/frames/
+# Raw source frames (original JPEGs — large, not needed for deployment)
+# Run: node scripts/convert-frames.js to regenerate WebP frames locally
 /source-frames/
+
+# NOTE: public/frames/ (WebP) IS committed — 35 MB total, fine for Vercel
