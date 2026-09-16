@@ -11,9 +11,9 @@ gsap.registerPlugin(ScrollTrigger);
 interface Stat { value: string; label: string; suffix?: string; }
 
 const stats: Stat[] = [
-  { value: "20", label: "Years of Trust", suffix: "+" },
+  { value: "16", label: "Years of Trust", suffix: "+" },
+  { value: "20", label: "Developments", suffix: "+" },
   { value: "4000", label: "Families Served", suffix: "+" },
-  { value: "10", label: "Developments", suffix: "+" },
   { value: "RERA", label: "Approved" },
 ];
 
@@ -181,7 +181,7 @@ export default function About() {
                 communities in carefully selected locations.
               </p>
               <p>
-                With over two decades of experience, our journey has been built
+                With over 16+ years of trusted excellence, our journey has been built
                 on transparency, quality craftsmanship, and long-term customer
                 relationships that outlast the transaction.
               </p>
@@ -195,7 +195,7 @@ export default function About() {
                 className="font-heading italic"
                 style={{ color: "#111111", fontSize: "clamp(1rem, 1.4vw, 1.2rem)", lineHeight: 1.6 }}
               >
-                &ldquo;20+ Years. 4000+ Families. One Foundation — Trust.&rdquo;
+                &ldquo;16+ Years. 4000+ Families. One Foundation — Trust.&rdquo;
               </p>
             </blockquote>
 

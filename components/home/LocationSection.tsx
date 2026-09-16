@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { GraduationCap, BookOpen, Train, Plane, Hospital, ShoppingBag, Road, Building, MapPin } from "lucide-react";
+import ProjectMap from "@/components/projects/ProjectMap";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -128,38 +129,16 @@ export default function LocationSection() {
               ))}
             </div>
 
-            {/* Google Maps — Vrindavan Grand */}
-            <div
-              className="overflow-hidden relative"
-              style={{ border: "1px solid #e8e3d8" }}
-              aria-label="Google Maps showing Vrindavan Grand location"
-            >
-              <div style={{ height: 280 }}>
-                <iframe
-                  title="Vrindavan Grand Location"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3672.4!2d75.7962981!3d22.6517804!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3962ffa1dcf006ff%3A0x702107c994a34b5b!2sVrindavan%20Grand!5e0!3m2!1sen!2sin!4v1!5m2!1sen!2sin"
-                  width="100%"
-                  height="280"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-              <div className="p-3 bg-white border-t border-[#e8e3d8] flex items-center justify-between">
-                <p className="font-body text-xs text-[#555]">
-                  SuryaMandir RRCAT, Indore, Madhya Pradesh
-                </p>
-                <a
-                  href="https://maps.app.goo.gl/Bbh2KBct435KMRVKA"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-base btn-gold text-[0.7rem] py-1.5 px-3 flex items-center gap-1.5"
-                >
-                  <MapPin size={12} />
-                  <span>Open Maps ↗</span>
-                </a>
-              </div>
+            {/* Interactive Location Visual — Vrindavan Grand */}
+            <div className="mt-2">
+              <ProjectMap
+                name="Vrindavan Grand (Flagship)"
+                location="Surya Mandir, RRCAT Road, Rau, Indore"
+                area="Rau / RRCAT"
+                lat={22.6517804}
+                lng={75.7962981}
+                googleMapsUrl="https://maps.app.goo.gl/Bbh2KBct435KMRVKA"
+              />
             </div>
           </div>
 

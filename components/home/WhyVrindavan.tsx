@@ -3,46 +3,89 @@
 import { useRef, useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { motion } from "framer-motion";
-import { Clock, Users, MapPin, Shield, Building2, TrendingUp } from "lucide-react";
+import {
+  Clock,
+  Users,
+  MapPin,
+  Shield,
+  Building2,
+  TrendingUp,
+} from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
 const features = [
-  { id: "experience", icon: Clock,     num: "01", title: "20+ Years Experience",   description: "Two decades of real-estate development and long-term customer relationships across Indore." },
-  { id: "families",   icon: Users,     num: "02", title: "2000+ Happy Families",   description: "A growing community of families who have chosen Vrindavan for their homes and investments." },
-  { id: "location",   icon: MapPin,    num: "03", title: "Prime Locations",        description: "Developments well-connected to Indore's key infrastructure and lifestyle destinations." },
-  { id: "rera",       icon: Shield,    num: "04", title: "RERA Approved",          description: "Projects developed with regulatory transparency, responsible planning and full compliance." },
-  { id: "quality",    icon: Building2, num: "05", title: "Quality Development",    description: "Attention to planning, infrastructure, landscaping and community living at every project." },
-  { id: "investment", icon: TrendingUp,num: "06", title: "Investment Potential",   description: "Projects in growing areas, designed for long-term value appreciation and community growth." },
+  {
+    id: "experience",
+    icon: Clock,
+    num: "01",
+    title: "16+ Years of Trust",
+    description:
+      "Over 16 years of committed real-estate development, excellence and long-term relationships across Indore.",
+  },
+  {
+    id: "families",
+    icon: Users,
+    num: "02",
+    title: "4000+ Happy Families",
+    description:
+      "A growing community of families who have chosen Vrindavan for their dream homes and investments.",
+  },
+  {
+    id: "location",
+    icon: MapPin,
+    num: "03",
+    title: "Prime Locations",
+    description:
+      "20+ developments well-connected to Indore's key infrastructure and lifestyle destinations.",
+  },
+  {
+    id: "rera",
+    icon: Shield,
+    num: "04",
+    title: "RERA Approved",
+    description:
+      "Projects developed with regulatory transparency, responsible planning and full compliance.",
+  },
+  {
+    id: "quality",
+    icon: Building2,
+    num: "05",
+    title: "Quality Development",
+    description:
+      "Attention to planning, infrastructure, landscaping and community living at every project.",
+  },
+  {
+    id: "investment",
+    icon: TrendingUp,
+    num: "06",
+    title: "Investment Potential",
+    description:
+      "Projects in growing areas, designed for long-term value appreciation and community growth.",
+  },
 ];
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.65, ease: [0.19, 1, 0.22, 1] as const, delay: i * 0.07 },
-  }),
-};
-
-function FeatureCard({ feature, index }: { feature: typeof features[0]; index: number }) {
+function FeatureCard({
+  feature,
+}: {
+  feature: (typeof features)[0];
+  index: number;
+}) {
   const Icon = feature.icon;
   return (
-    <motion.div
-      custom={index}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: "-8%" }}
-      variants={cardVariants}
-      whileHover={{ y: -3 }}
-      className="group relative bg-white flex flex-col p-7 cursor-default transition-all duration-400"
+    <div
+      className="why-feature-card group relative bg-white flex flex-col p-7 cursor-default transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
       style={{ border: "1px solid #e8e3d8", minHeight: "220px" }}
       id={`why-card-${feature.id}`}
     >
       {/* Number — top right */}
       <span
         className="absolute top-5 right-5 font-heading font-bold"
-        style={{ fontSize: "0.6rem", letterSpacing: "0.12em", color: "rgba(201,168,76,0.3)" }}
+        style={{
+          fontSize: "0.6rem",
+          letterSpacing: "0.12em",
+          color: "rgba(201,168,76,0.3)",
+        }}
         aria-hidden="true"
       >
         {feature.num}
@@ -50,9 +93,10 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
 
       {/* Icon */}
       <div
-        className="flex items-center justify-center mb-5 flex-shrink-0 transition-colors duration-300"
+        className="flex items-center justify-center mb-5 flex-shrink-0 transition-colors duration-300 group-hover:bg-brand-gold/20"
         style={{
-          width: "2.8rem", height: "2.8rem",
+          width: "2.8rem",
+          height: "2.8rem",
           background: "rgba(201,168,76,0.09)",
           border: "1px solid rgba(201,168,76,0.22)",
           color: "#c9a84c",
@@ -83,7 +127,7 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
         style={{ height: "2px", background: "#c9a84c" }}
         aria-hidden="true"
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -93,10 +137,38 @@ export default function WhyVrindavan() {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.fromTo(headingRef.current, { opacity: 0, y: 28 }, {
-        opacity: 1, y: 0, duration: 0.9, ease: "power3.out",
-        scrollTrigger: { trigger: headingRef.current, start: "top 82%", once: true },
-      });
+      gsap.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 28 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.9,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: headingRef.current,
+            start: "top 82%",
+            once: true,
+          },
+        }
+      );
+
+      gsap.fromTo(
+        ".why-feature-card",
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "power3.out",
+          stagger: 0.08,
+          scrollTrigger: {
+            trigger: ".why-feature-grid",
+            start: "top 85%",
+            once: true,
+          },
+        }
+      );
     }, sectionRef.current ?? undefined);
     return () => ctx.revert();
   }, []);
@@ -110,7 +182,6 @@ export default function WhyVrindavan() {
       aria-labelledby="why-heading"
     >
       <div className="container-wide">
-
         {/* Section Header */}
         <div ref={headingRef} className="text-center mb-14 opacity-0">
           <p className="section-label">Why Choose Us</p>
@@ -125,16 +196,23 @@ export default function WhyVrindavan() {
           <div className="gold-rule-center" style={{ marginTop: "1.25rem" }} />
           <p
             className="font-body mx-auto mt-4"
-            style={{ color: "#666666", maxWidth: "400px", marginLeft: "auto", marginRight: "auto", fontSize: "clamp(0.9rem, 1.1vw, 1rem)", lineHeight: 1.7 }}
+            style={{
+              color: "#666666",
+              maxWidth: "400px",
+              marginLeft: "auto",
+              marginRight: "auto",
+              fontSize: "clamp(0.9rem, 1.1vw, 1rem)",
+              lineHeight: 1.7,
+            }}
           >
             Two decades of experience, thousands of happy families, and a
             commitment to building communities you can trust.
           </p>
         </div>
 
-        {/* 3-column card grid — proper spacing */}
+        {/* 3-column card grid */}
         <div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+          className="why-feature-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
           role="list"
           aria-label="Why choose Vrindavan Group"
         >
@@ -144,7 +222,6 @@ export default function WhyVrindavan() {
             </div>
           ))}
         </div>
-
       </div>
     </section>
   );

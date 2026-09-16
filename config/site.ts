@@ -10,8 +10,9 @@ export const siteConfig = {
   state: "Madhya Pradesh",
   country: "India",
   postalCode: "452001",
-  experience: "20+",
-  satisfiedFamilies: "2000+",
+  experience: "16+",
+  developments: "20+",
+  satisfiedFamilies: "4000+",
 
   // Geo Coordinates for Local SEO (Indore, MP)
   geo: {

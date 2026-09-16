@@ -86,7 +86,7 @@ export default function ContactSection() {
                 className="font-heading italic"
                 style={{ color: "#111111", fontSize: "clamp(0.95rem, 1.1vw, 1.1rem)", lineHeight: 1.6 }}
               >
-                &ldquo;20+ Years. 2000+ Families. One Foundation — Trust.&rdquo;
+                &ldquo;16+ Years. 4000+ Families. One Foundation — Trust.&rdquo;
               </p>
               <p
                 className="font-body mt-2"

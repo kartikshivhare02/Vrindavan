@@ -1,604 +1,168 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-
-gsap.registerPlugin(ScrollTrigger);
-
-// ─── Configuration ─────────────────────────────────────────────────────────
-// Adjust these values to tune the animation
-const TOTAL_FRAMES = 480;         // Total number of frames in the sequence
-const SCROLL_LENGTH = "+=500%";   // Height of the sticky scroll section (400%-700%)
-const LERP_FACTOR = 0.12;         // Cinematic inertia (lower = smoother but laggier)
-const PRELOAD_BATCH_SIZE = 10;    // Frames loaded per batch (larger = faster fill, frames are now smaller)
-const PRELOAD_BATCH_INTERVAL = 25; // ms between batches
-const NEAR_RADIUS = 30;           // Priority preload radius around current frame
-
-// Desktop: public/frames/desktop/ — q75/effort6, full 1280×720 (~28 MB total)
-// Mobile:  public/frames/mobile/  — q65/effort6, 720px wide  (~12 MB total)
-// Mobile sequence serves viewports ≤768px
-const FRAME_PATH_DESKTOP = (i: number) =>
-  `/frames/desktop/frame_${String(i).padStart(4, "0")}.webp`;
-const FRAME_PATH_MOBILE = (i: number) =>
-  `/frames/mobile/frame_${String(i).padStart(4, "0")}.webp`;
-
-// ─── Hero Text Stages ────────────────────────────────────────────────────────
-interface HeroStage {
-  startPct: number;
-  endPct: number;
-  eyebrow?: string;
-  title: string;
-  subtitle?: string;
-  body?: string;
-  ctas?: { label: string; href: string; variant: "primary" | "outline" }[];
-}
-
-const heroStages: HeroStage[] = [
-  {
-    startPct: 0,
-    endPct: 0.18,
-    eyebrow: "WELCOME TO",
-    title: "VRINDAVAN\nGROUP",
-    subtitle: "Building Landmarks. Creating Communities.",
-    ctas: [
-      { label: "Explore Projects", href: "/projects", variant: "primary" },
-    ],
-  },
-  {
-    startPct: 0.22,
-    endPct: 0.40,
-    title: "20+ YEARS",
-    subtitle: "OF TRUST & EXPERIENCE",
-    body: "Creating thoughtfully planned communities and helping families find a place they can proudly call home.",
-  },
-  {
-    startPct: 0.44,
-    endPct: 0.62,
-    title: "2000+",
-    subtitle: "HAPPY FAMILIES",
-    body: "Thousands of families. One foundation — trust.",
-  },
-  {
-    startPct: 0.66,
-    endPct: 0.82,
-    title: "PREMIUM\nPROJECTS",
-    subtitle: "ACROSS INDORE",
-    body: "Prime locations. Modern amenities. RERA-approved developments.",
-  },
-  {
-    startPct: 0.85,
-    endPct: 1,
-    title: "Your Next Address\nStarts Here.",
-    ctas: [
-      { label: "View Projects", href: "#projects", variant: "primary" },
-      {
-        label: "Schedule a Site Visit",
-        href: "#contact",
-        variant: "outline",
-      },
-    ],
-  },
-];
-
-// ─── Cover-crop draw helper ──────────────────────────────────────────────────
-function drawCoverFrame(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | ImageBitmap,
-  canvasW: number,
-  canvasH: number
-) {
-  const imgW = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
-  const imgH = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
-  if (!imgW || !imgH) return;
-
-  const canvasAspect = canvasW / canvasH;
-  const imgAspect = imgW / imgH;
-
-  let sx = 0, sy = 0, sw = imgW, sh = imgH;
-
-  if (imgAspect > canvasAspect) {
-    // Image is wider — crop sides
-    sw = imgH * canvasAspect;
-    sx = (imgW - sw) / 2;
-  } else {
-    // Image is taller — crop top/bottom
-    sh = imgW / canvasAspect;
-    sy = (imgH - sh) / 2;
-  }
-
-  ctx.drawImage(img as CanvasImageSource, sx, sy, sw, sh, 0, 0, canvasW, canvasH);
-}
-
-// ─── Detect mobile for adaptive quality ──────────────────────────────────────
-function isMobileViewport() {
-  return typeof window !== "undefined" && window.innerWidth <= 768;
-}
+import { ArrowRight, ChevronDown, Shield, Sparkles, Building2, Users, Award } from "lucide-react";
+import { gsap } from "gsap";
 
 export default function ScrollVideoHero() {
-  const sectionRef        = useRef<HTMLDivElement>(null);
-  const pinContainerRef   = useRef<HTMLDivElement>(null);
-  const canvasRef         = useRef<HTMLCanvasElement>(null);
-  const scrollIndicatorRef = useRef<HTMLDivElement>(null);
-  const progressBarRef    = useRef<HTMLDivElement>(null);
-  const textStageRefs     = useRef<(HTMLDivElement | null)[]>([]);
+  const heroContentRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Animation state (no re-renders)
-  const rafRef          = useRef<number | null>(null);
-  const targetFrameRef  = useRef(0);
-  const currentFrameRef = useRef(0);
-  const lastDrawnFrame  = useRef(-1);
-
-  // Dual caches: HTMLImageElement (fallback) + ImageBitmap (when available)
-  const imageCache  = useRef<Map<number, HTMLImageElement>>(new Map());
-  const bitmapCache = useRef<Map<number, ImageBitmap>>(new Map());
-  const loadingSet  = useRef<Set<number>>(new Set());
-
-  const ctxRef      = useRef<CanvasRenderingContext2D | null>(null);
-  const canvasDims  = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
-  const isMobile    = useRef(false);
-  const sectionInView = useRef(false);
-
-  // Path selector based on viewport at mount time
-  const framePath = useCallback((i: number) => {
-    return isMobile.current ? FRAME_PATH_MOBILE(i) : FRAME_PATH_DESKTOP(i);
-  }, []);
-
-  // ── Resize canvas to match high-DPI displays ──────────────────────────────
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx    = ctxRef.current;
-    if (!canvas || !ctx) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w   = window.innerWidth;
-    const h   = window.innerHeight;
-
-    canvas.width  = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width  = `${w}px`;
-    canvas.style.height = `${h}px`;
-    ctx.scale(dpr, dpr);
-    canvasDims.current = { w, h };
-
-    // Redraw current frame after resize
-    const fn = Math.round(currentFrameRef.current);
-    const bmp = bitmapCache.current.get(fn);
-    const img = imageCache.current.get(fn);
-    const src = bmp ?? img;
-    if (src) {
-      ctx.clearRect(0, 0, w, h);
-      drawCoverFrame(ctx, src as HTMLImageElement | ImageBitmap, w, h);
-    }
-  }, []);
-
-  // ── Load a frame with optional ImageBitmap upgrade ───────────────────────
-  const loadFrame = useCallback(
-    (index: number, onLoad?: (img: HTMLImageElement) => void) => {
-      if (index < 0 || index >= TOTAL_FRAMES) return;
-      if (imageCache.current.has(index)) {
-        if (onLoad) onLoad(imageCache.current.get(index)!);
-        return;
-      }
-      if (loadingSet.current.has(index)) return;
-
-      loadingSet.current.add(index);
-      const img = new Image();
-      img.src = framePath(index);
-      img.decoding = "async";
-
-      img.onload = () => {
-        imageCache.current.set(index, img);
-        loadingSet.current.delete(index);
-
-        // Optionally upgrade to ImageBitmap for zero-copy GPU rendering
-        // Tradeoff: faster draw() but uses extra GPU memory; skip on mobile
-        if (!isMobile.current && typeof createImageBitmap === "function") {
-          createImageBitmap(img, { resizeQuality: "high" })
-            .then((bmp) => bitmapCache.current.set(index, bmp))
-            .catch(() => {}); // silently fall back to img
-        }
-
-        if (onLoad) onLoad(img);
-      };
-
-      img.onerror = () => {
-        loadingSet.current.delete(index);
-        if (process.env.NODE_ENV === "development") {
-          console.warn(`[ScrollVideoHero] Missing frame: ${img.src}`);
-        }
-      };
-    },
-    [framePath]
-  );
-
-  // ── Find nearest available frame (never display blank) ────────────────────
-  const getNearestLoadedFrame = useCallback(
-    (target: number): HTMLImageElement | ImageBitmap | null => {
-      // Prefer ImageBitmap if available (faster draw)
-      if (bitmapCache.current.has(target)) return bitmapCache.current.get(target)!;
-      if (imageCache.current.has(target)) return imageCache.current.get(target)!;
-
-      for (let radius = 1; radius < TOTAL_FRAMES; radius++) {
-        const lo = target - radius;
-        const hi = target + radius;
-        if (bitmapCache.current.has(lo)) return bitmapCache.current.get(lo)!;
-        if (imageCache.current.has(lo)) return imageCache.current.get(lo)!;
-        if (bitmapCache.current.has(hi)) return bitmapCache.current.get(hi)!;
-        if (imageCache.current.has(hi)) return imageCache.current.get(hi)!;
-      }
-      return null;
-    },
-    []
-  );
-
-  // ── Priority frame preloader: loads frames closest to current first ───────
-  const schedulePriorityLoad = useCallback(
-    (center: number) => {
-      const toLoad: number[] = [];
-      for (let r = 1; r <= NEAR_RADIUS; r++) {
-        const lo = center - r;
-        const hi = center + r;
-        if (lo >= 0 && lo < TOTAL_FRAMES && !imageCache.current.has(lo) && !loadingSet.current.has(lo)) toLoad.push(lo);
-        if (hi >= 0 && hi < TOTAL_FRAMES && !imageCache.current.has(hi) && !loadingSet.current.has(hi)) toLoad.push(hi);
-      }
-      toLoad.forEach((idx) => loadFrame(idx));
-    },
-    [loadFrame]
-  );
-
-  // ── Smooth RAF render loop ────────────────────────────────────────────────
-  const renderLoop = useCallback(() => {
-    const target  = targetFrameRef.current;
-    const current = currentFrameRef.current;
-    const diff    = target - current;
-
-    if (Math.abs(diff) > 0.001) {
-      currentFrameRef.current += diff * LERP_FACTOR;
-    } else {
-      currentFrameRef.current = target;
-    }
-
-    const frameToDraw = Math.round(currentFrameRef.current);
-    const ctx = ctxRef.current;
-    const { w, h } = canvasDims.current;
-
-    // Only redraw when the calculated frame index actually changes
-    if (ctx && w > 0 && h > 0 && frameToDraw !== lastDrawnFrame.current) {
-      const src = getNearestLoadedFrame(frameToDraw);
-      if (src) {
-        ctx.clearRect(0, 0, w, h);
-        drawCoverFrame(ctx, src as HTMLImageElement | ImageBitmap, w, h);
-        lastDrawnFrame.current = frameToDraw;
-      }
-    }
-
-    // Update left-side progress indicator
-    const progress = currentFrameRef.current / (TOTAL_FRAMES - 1);
-    if (progressBarRef.current) {
-      progressBarRef.current.style.height = `${progress * 100}%`;
-    }
-
-    // Animate text stages (sine easing, scale & blur)
-    heroStages.forEach((stage, i) => {
-      const el = textStageRefs.current[i];
-      if (!el) return;
-
-      const { startPct, endPct } = stage;
-      const fadeBand = (endPct - startPct) * 0.28;
-
-      if (progress >= startPct && progress <= endPct) {
-        let opacity = 1, y = 0, scale = 1, blur = 0;
-
-        if (progress < startPct + fadeBand) {
-          const rawT = (progress - startPct) / fadeBand;
-          const t = Math.sin((rawT * Math.PI) / 2);
-          opacity = t; y = (1 - t) * 30; scale = 0.97 + t * 0.03; blur = (1 - t) * 2.5;
-        } else if (progress > endPct - fadeBand) {
-          const rawT = (progress - (endPct - fadeBand)) / fadeBand;
-          const t = Math.sin((rawT * Math.PI) / 2);
-          opacity = 1 - t; y = -t * 24; scale = 1 + t * 0.02; blur = t * 2.5;
-        }
-
-        el.style.opacity = `${opacity}`;
-        el.style.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
-        el.style.filter = blur > 0.1 ? `blur(${blur}px)` : "none";
-        el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
-      } else {
-        el.style.opacity = "0";
-        el.style.transform = `translate3d(0, ${progress < startPct ? 30 : -24}px, 0) scale(0.97)`;
-        el.style.filter = "none";
-        el.style.pointerEvents = "none";
-      }
-    });
-
-    rafRef.current = requestAnimationFrame(renderLoop);
-  }, [getNearestLoadedFrame]);
-
-  // ── Main effect ───────────────────────────────────────────────────────────
   useEffect(() => {
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const section      = sectionRef.current;
-    const pinContainer = pinContainerRef.current;
-    const canvas       = canvasRef.current;
-    if (!section || !pinContainer || !canvas) return;
-
-    // Detect mobile once at mount
-    isMobile.current = isMobileViewport();
-
-    const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: false });
-    if (!ctx) return;
-    ctxRef.current = ctx;
-
-    resizeCanvas();
-
-    // Phase 1: Load frame 0 instantly — highest priority
-    loadFrame(0, (img) => {
-      drawCoverFrame(ctx, img, canvasDims.current.w, canvasDims.current.h);
-      lastDrawnFrame.current = 0;
-    });
-
-    if (prefersReduced) {
-      // Accessibility: static first frame only, no scroll animation
-      return;
-    }
-
-    // Phase 2: Preload first ~30 frames immediately for fast initial scroll
-    for (let i = 1; i <= 30 && i < TOTAL_FRAMES; i++) loadFrame(i);
-
-    // Phase 3: Progressive batch load of remaining frames
-    let nextBatchIdx = 31;
-    let batchTimer: ReturnType<typeof setInterval> | null = null;
-
-    function startBatchLoad() {
-      if (batchTimer) return;
-      batchTimer = setInterval(() => {
-        if (nextBatchIdx >= TOTAL_FRAMES) {
-          if (batchTimer) clearInterval(batchTimer);
-          batchTimer = null;
-          return;
-        }
-        for (let b = 0; b < PRELOAD_BATCH_SIZE && nextBatchIdx < TOTAL_FRAMES; b++, nextBatchIdx++) {
-          loadFrame(nextBatchIdx);
-        }
-      }, PRELOAD_BATCH_INTERVAL);
-    }
-
-    // Phase 4: IntersectionObserver — start aggressive loading when near viewport
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          sectionInView.current = entry.isIntersecting;
-          if (entry.isIntersecting) {
-            startBatchLoad();
-          }
-        });
-      },
-      { rootMargin: "400px 0px" } // Start loading 400px before it enters viewport
-    );
-    observer.observe(section);
-
-    // Start batch load immediately (observer fires when already in view)
-    startBatchLoad();
-
-    // Phase 5: Start RAF render loop
-    rafRef.current = requestAnimationFrame(renderLoop);
-
-    // Phase 6: GSAP ScrollTrigger for pinning + scroll progress
-    const gsapCtx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: section,
-        pin: pinContainer,
-        start: "top top",
-        end: SCROLL_LENGTH,
-        scrub: 0.8,
-        pinSpacing: true,
-        anticipatePin: 1,
-        onUpdate: (self) => {
-          // Map scroll progress [0,1] → frame index [0, TOTAL_FRAMES-1]
-          targetFrameRef.current = self.progress * (TOTAL_FRAMES - 1);
-
-          // Load priority frames near current scroll position
-          const centerFrame = Math.round(self.progress * (TOTAL_FRAMES - 1));
-          schedulePriorityLoad(centerFrame);
-
-          // Fade out scroll indicator
-          if (scrollIndicatorRef.current) {
-            const indOpacity = Math.max(0, 1 - self.progress * 20);
-            scrollIndicatorRef.current.style.opacity = `${indOpacity}`;
-            scrollIndicatorRef.current.style.transform =
-              `translate3d(-50%, ${self.progress * -20}px, 0)`;
-          }
-        },
+    // Attempt automatic playback on mount
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {
+        // Autoplay may be restricted in some low-power modes; muted playsInline handles most
       });
-    }, section);
+    }
 
-    // Resize handler
-    const handleResize = () => {
-      isMobile.current = isMobileViewport();
-      resizeCanvas();
-    };
-    window.addEventListener("resize", handleResize, { passive: true });
+    // Smooth entrance animation for text
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        ".hero-anim-item",
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1,
+          ease: "power3.out",
+          stagger: 0.15,
+          delay: 0.2,
+        }
+      );
+    }, heroContentRef.current ?? undefined);
 
-    return () => {
-      if (batchTimer) clearInterval(batchTimer);
-      gsapCtx.revert();
-      observer.disconnect();
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", handleResize);
-      // Clear caches
-      bitmapCache.current.forEach((bmp) => bmp.close());
-      bitmapCache.current.clear();
-      imageCache.current.clear();
-      loadingSet.current.clear();
-      ctxRef.current = null;
-    };
-  }, [loadFrame, renderLoop, resizeCanvas, schedulePriorityLoad]);
+    return () => ctx.revert();
+  }, []);
 
   return (
     <section
-      ref={sectionRef}
-      className="relative w-full min-h-screen"
-      id="hero"
-      aria-label="Vrindavan Group — Cinematic Hero"
+      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-charcoal"
+      aria-label="Vrindavan Group Hero"
     >
+      {/* ── Background Video ── */}
+      <div className="absolute inset-0 z-0">
+        <video
+          ref={videoRef}
+          src="/video/vrindavan-hero.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover scale-105"
+          poster="/images/projects/vrindavan-grand/main.jpg"
+        />
+        {/* Cinematic Dual-Tone Dark Gradient Overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 90% 70% at 50% 45%, rgba(10, 24, 18, 0.45) 0%, rgba(10, 15, 12, 0.88) 80%, rgba(8, 12, 10, 0.96) 100%)",
+          }}
+          aria-hidden="true"
+        />
+        <div
+          className="absolute inset-0 bg-black/35 pointer-events-none"
+          aria-hidden="true"
+        />
+      </div>
+
+      {/* ── Centered Hero Content (Appears without scrolling) ── */}
       <div
-        ref={pinContainerRef}
-        className="hero-pin-wrapper relative w-full h-screen overflow-hidden bg-black"
+        ref={heroContentRef}
+        className="container-wide relative z-10 text-center flex flex-col items-center justify-center pt-32 pb-24 px-4 max-w-5xl mx-auto"
       >
-        {/* Hardware-Accelerated Canvas Frame Player */}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none will-change-transform"
-          aria-hidden="true"
-        />
-
-        {/* Gradient Overlay for Text Legibility */}
-        <div
-          className="absolute inset-0 z-10 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.65) 100%)",
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Bottom subtle blend */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-40 z-10 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(to top, rgba(250,250,248,0.35) 0%, transparent 100%)",
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Text Overlay Container */}
-        <div
-          className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-          aria-live="polite"
-        >
-          <div className="container-wide w-full h-full relative">
-            {heroStages.map((stage, i) => (
-              <div
-                key={i}
-                ref={(el) => { textStageRefs.current[i] = el; }}
-                className="absolute inset-0 flex items-center"
-                style={{ pointerEvents: "auto" }}
-              >
-                <div className="max-w-3xl px-1 sm:px-0">
-                  {/* Eyebrow */}
-                  {stage.eyebrow && (
-                    <p className="font-body text-xs md:text-sm font-medium tracking-[0.3em] text-brand-gold mb-3 uppercase">
-                      {stage.eyebrow}
-                    </p>
-                  )}
-
-                  {/* Main Title */}
-                  <h1
-                    className="font-heading font-bold text-white leading-[0.95] mb-4 whitespace-pre-line text-shadow-sm"
-                    style={{ fontSize: "clamp(2.2rem, 7.5vw, 6.5rem)" }}
-                  >
-                    {stage.title}
-                  </h1>
-
-                  {/* Subtitle */}
-                  {stage.subtitle && (
-                    <p
-                      className="font-body font-light tracking-[0.15em] text-white/90 uppercase mb-4"
-                      style={{ fontSize: "clamp(0.875rem, 1.4vw, 1.25rem)" }}
-                    >
-                      {stage.subtitle}
-                    </p>
-                  )}
-
-                  {/* Body */}
-                  {stage.body && (
-                    <p
-                      className="font-body text-white/80 leading-relaxed max-w-lg mb-4"
-                      style={{ fontSize: "clamp(0.95rem, 1.2vw, 1.15rem)" }}
-                    >
-                      {stage.body}
-                    </p>
-                  )}
-
-                  {/* CTAs */}
-                  {stage.ctas && stage.ctas.length > 0 && (
-                    <div className="flex flex-wrap gap-3 mt-5">
-                      {stage.ctas.map((cta, ci) => (
-                        <Link
-                          key={ci}
-                          href={cta.href}
-                          className={`btn-base ${
-                            cta.variant === "primary" ? "btn-gold" : "btn-outline-white"
-                          } group shadow-lg`}
-                          id={`hero-cta-${i}-${ci}`}
-                        >
-                          {cta.label}
-                          <ArrowRight
-                            size={14}
-                            className="group-hover:translate-x-1 transition-transform"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Progress Line — Left side */}
-        <div
-          className="absolute left-8 top-1/2 -translate-y-1/2 z-30 hidden lg:flex flex-col items-center gap-2"
-          aria-hidden="true"
-        >
-          <div
-            className="w-[2px] bg-white/20 relative overflow-hidden rounded-full"
-            style={{ height: 90 }}
-          >
-            <div
-              ref={progressBarRef}
-              className="absolute top-0 left-0 right-0 bg-brand-gold transition-[height] duration-75 ease-out"
-              style={{ height: "0%" }}
-            />
-          </div>
-          <span
-            className="text-white/50 text-[9px] font-body tracking-[0.25em] uppercase font-semibold"
-            style={{ writingMode: "vertical-rl" }}
-          >
-            Scroll
+        {/* Eyebrow badge */}
+        <div className="hero-anim-item opacity-0 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 mb-6 shadow-lg">
+          <span className="h-2 w-2 rounded-full bg-brand-gold animate-pulse" />
+          <span className="font-body text-xs font-semibold uppercase tracking-[0.2em] text-brand-gold">
+            16+ Years of Trust & Excellence
           </span>
         </div>
 
-        {/* Scroll Indicator */}
-        <div
-          ref={scrollIndicatorRef}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2"
-          aria-hidden="true"
+        {/* Main Brand Headline */}
+        <h1
+          className="hero-anim-item opacity-0 font-heading font-bold text-white tracking-tight leading-[1.05] mb-4"
+          style={{ fontSize: "clamp(2.8rem, 7vw, 5.5rem)" }}
         >
-          <div className="w-5 h-8 rounded-full border border-white/60 flex items-start justify-center p-1">
-            <div className="w-1 h-2 bg-white/90 rounded-full animate-scroll-down" />
+          VRINDAVAN <span style={{ color: "#c9a84c" }}>GROUP</span>
+        </h1>
+
+        {/* Subtitle / Tagline */}
+        <p
+          className="hero-anim-item opacity-0 font-heading font-medium italic text-brand-gold/95 mb-6 text-lg md:text-2xl tracking-wide max-w-2xl"
+        >
+          &ldquo;Building Landmarks. Creating Communities.&rdquo;
+        </p>
+
+        {/* Supporting description */}
+        <p
+          className="hero-anim-item opacity-0 font-body text-white/80 text-sm md:text-base leading-relaxed max-w-2xl mb-8"
+        >
+          Central India&apos;s premier real estate developer. Delivering RERA-approved
+          township developments, premium residential plots, and lifestyle destinations across
+          Indore&apos;s top growth corridors.
+        </p>
+
+        {/* Key Metrics Pill Bar */}
+        <div className="hero-anim-item opacity-0 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-3xl mb-10">
+          <div className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-sm flex flex-col items-center justify-center">
+            <span className="font-heading font-bold text-white text-lg md:text-xl">16+</span>
+            <span className="font-body text-[11px] text-white/70 uppercase tracking-wider">Years of Trust</span>
           </div>
-          <p className="font-body text-white/70 text-[11px] tracking-[0.25em] uppercase">
-            Scroll to Explore
-          </p>
+          <div className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-sm flex flex-col items-center justify-center">
+            <span className="font-heading font-bold text-brand-gold text-lg md:text-xl">20+</span>
+            <span className="font-body text-[11px] text-white/70 uppercase tracking-wider">Developments</span>
+          </div>
+          <div className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-sm flex flex-col items-center justify-center">
+            <span className="font-heading font-bold text-white text-lg md:text-xl">4000+</span>
+            <span className="font-body text-[11px] text-white/70 uppercase tracking-wider">Happy Families</span>
+          </div>
+          <div className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-sm flex flex-col items-center justify-center">
+            <span className="font-heading font-bold text-brand-gold text-lg md:text-xl">100%</span>
+            <span className="font-body text-[11px] text-white/70 uppercase tracking-wider">RERA Approved</span>
+          </div>
         </div>
 
-        {/* Year Label */}
-        <div
-          className="absolute top-8 right-8 z-30 hidden lg:block"
-          aria-hidden="true"
-        >
-          <p className="font-body text-white/40 text-[11px] tracking-widest uppercase font-medium">
-            Est. 2004 • Indore
-          </p>
+        {/* Call to Actions */}
+        <div className="hero-anim-item opacity-0 flex flex-wrap items-center justify-center gap-4">
+          <Link
+            href="/projects"
+            className="btn-base btn-gold text-xs px-8 py-3.5 shadow-xl hover:shadow-brand-gold/20 flex items-center gap-2 group transition-all"
+            id="hero-explore-projects"
+          >
+            <span>Explore Projects</span>
+            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <a
+            href="#about"
+            className="btn-base btn-outline-white text-xs px-7 py-3.5 backdrop-blur-sm hover:bg-white/10 transition-all"
+            id="hero-learn-more"
+          >
+            About Us
+          </a>
+          <a
+            href="#contact"
+            className="btn-base bg-white/10 text-white border border-white/20 text-xs px-7 py-3.5 backdrop-blur-sm hover:bg-white/20 transition-all"
+            id="hero-contact-us"
+          >
+            Contact
+          </a>
         </div>
       </div>
+
+      {/* ── Scroll Down Indicator (Jumps straight to About Us) ── */}
+      <a
+        href="#about"
+        aria-label="Scroll to About Vrindavan Group"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 text-white/60 hover:text-brand-gold transition-colors group cursor-pointer"
+      >
+        <span className="font-body text-[10px] uppercase tracking-[0.2em] font-medium">
+          Scroll to Explore
+        </span>
+        <ChevronDown size={18} className="animate-bounce text-brand-gold" />
+      </a>
     </section>
   );
 }

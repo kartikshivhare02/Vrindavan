@@ -18,6 +18,7 @@ import { projects, getProjectBySlug, DEFAULT_MAP_EMBED_URL } from "@/data/projec
 import { siteConfig } from "@/config/site";
 import { formatWhatsAppUrl } from "@/lib/utils";
 import ProjectGallery from "@/components/projects/ProjectGallery";
+import ProjectMap from "@/components/projects/ProjectMap";
 import EnquiryForm from "@/components/contact/EnquiryForm";
 
 // Generate static params for all projects
@@ -140,9 +141,9 @@ export default async function ProjectPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* ── Project Hero & Breadcrumbs ───────────────────────────────────────── */}
+      {/* ── Project Hero ────────────────────────────────────────────────────── */}
       <section
-        className="relative overflow-hidden flex flex-col justify-between min-h-[75vh] md:min-h-[82vh] pt-28 md:pt-32 pb-16"
+        className="relative overflow-hidden flex items-center justify-center min-h-[75vh] md:min-h-[82vh] pt-32 md:pt-36 pb-16"
         aria-label={`${project.name} hero image`}
       >
         {/\.(mp4|webm|ogg|mov)$/i.test(project.mainImage) ? (
@@ -169,34 +170,16 @@ export default async function ProjectPage({
           className="absolute inset-0 z-0"
           style={{
             background:
-              "linear-gradient(to bottom, rgba(10,24,18,0.85) 0%, rgba(10,18,14,0.55) 45%, rgba(10,15,12,0.92) 100%)",
+              "linear-gradient(to bottom, rgba(10,24,18,0.85) 0%, rgba(10,18,14,0.6) 45%, rgba(10,15,12,0.92) 100%)",
           }}
           aria-hidden="true"
         />
 
-        {/* Top: Integrated Breadcrumbs */}
-        <div className="relative z-10 container-wide mb-8">
-          <nav
-            className="inline-flex items-center gap-2 text-xs font-body px-3.5 py-1.5 rounded-xs bg-black/30 backdrop-blur-md border border-white/10 text-white/70"
-            aria-label="Breadcrumb"
-          >
-            <Link href="/" className="hover:text-brand-gold transition-colors">
-              Home
-            </Link>
-            <span className="text-brand-gold/60">/</span>
-            <Link href="/projects" className="hover:text-brand-gold transition-colors">
-              Projects
-            </Link>
-            <span className="text-brand-gold/60">/</span>
-            <span className="text-brand-gold font-medium">{project.name}</span>
-          </nav>
-        </div>
-
-        {/* Bottom: Project Title & Details */}
-        <div className="relative z-10 container-wide flex flex-col justify-end">
+        {/* Center: Project Title & Details */}
+        <div className="relative z-10 container-wide flex flex-col items-center text-center max-w-4xl mx-auto px-4">
           {/* Project index & RERA Badge */}
-          <div className="flex flex-wrap items-center gap-3 mb-3">
-            <span className="font-body text-white/50 text-xs tracking-widest uppercase">
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-3">
+            <span className="font-body text-white/60 text-xs tracking-widest uppercase">
               Project {project.index} of {projects.length}
             </span>
             {project.reraNumber && (
@@ -218,7 +201,7 @@ export default async function ProjectPage({
             href={project.googleMapsUrl || "https://maps.app.goo.gl/Bbh2KBct435KMRVKA"}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-white/80 hover:text-brand-gold font-body text-sm mb-2 transition-colors group"
+            className="inline-flex items-center justify-center gap-2 text-white/80 hover:text-brand-gold font-body text-sm mb-3 transition-colors group"
             title="Open project location on Google Maps"
           >
             <MapPin size={14} className="text-brand-gold group-hover:scale-110 transition-transform" />
@@ -226,12 +209,12 @@ export default async function ProjectPage({
             <span className="text-[0.65rem] bg-brand-gold/20 text-brand-gold px-2 py-0.5 rounded-xs border border-brand-gold/30">View on Google Maps ↗</span>
           </a>
 
-          <p className="font-body text-brand-gold font-medium text-base md:text-lg italic mb-6">
+          <p className="font-body text-brand-gold font-medium text-base md:text-lg italic mb-8 max-w-2xl">
             &ldquo;{project.tagline}&rdquo;
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <a
               href="#project-enquiry"
               className="btn-base btn-gold text-xs px-6 py-3"
@@ -272,7 +255,10 @@ export default async function ProjectPage({
               {
                 icon: <Home size={18} />,
                 label: "Type",
-                value: project.propertyTypes.join(", ") || "[Property Type]",
+                value:
+                  (Array.isArray(project.propertyTypes)
+                    ? project.propertyTypes.join(", ")
+                    : project.propertyTypes) || "[Property Type]",
               },
               {
                 icon: <MapPin size={18} />,
@@ -434,27 +420,37 @@ export default async function ProjectPage({
         </section>
       )}
 
-      {/* ── Location Advantages ───────────────────────────────────────────────── */}
-      {project.locationAdvantages.length > 0 && (
-        <section
-          className="section-padding bg-charcoal"
-          aria-labelledby="location-adv-heading"
-        >
-          <div className="container-narrow">
-            <h2
-              id="location-adv-heading"
-              className="font-heading font-bold text-white mb-8"
-              style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)" }}
-            >
-              Everything You Need,{" "}
-              <span className="text-brand-gold">Close to Home</span>
-            </h2>
+      {/* ── Location & Connectivity with Individual Google Map Visual ───────────────────────── */}
+      <section
+        id="project-location"
+        className="section-padding bg-charcoal"
+        aria-labelledby="location-adv-heading"
+      >
+        <div className="container-narrow">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+            <div>
+              <p className="font-body text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase mb-2">
+                Prime Connectivity
+              </p>
+              <h2
+                id="location-adv-heading"
+                className="font-heading font-bold text-white"
+                style={{ fontSize: "clamp(1.8rem, 3vw, 2.5rem)" }}
+              >
+                Location & <span className="text-brand-gold">Connectivity</span>
+              </h2>
+            </div>
+            <p className="font-body text-white/60 text-xs md:text-sm max-w-md">
+              {project.name} is strategically positioned in {project.area || project.location}, offering effortless access to Indore&apos;s key destinations.
+            </p>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {project.locationAdvantages && project.locationAdvantages.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {project.locationAdvantages.map((cat) => (
                 <div
                   key={cat.category}
-                  className="p-6 rounded-sm bg-white/5 border border-white/10"
+                  className="p-6 rounded-sm bg-white/5 border border-white/10 hover:border-brand-gold/40 transition-colors"
                 >
                   <h3 className="font-heading font-semibold text-white mb-4 flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-brand-gold" aria-hidden="true" />
@@ -478,40 +474,19 @@ export default async function ProjectPage({
                 </div>
               ))}
             </div>
+          )}
 
-            {/* Google Maps Container */}
-            <div className="mt-8 rounded-sm overflow-hidden border border-white/10 relative">
-              <div style={{ height: 280 }} className="w-full">
-                <iframe
-                  title={`${project.name} Location on Google Maps`}
-                  src={project.googleMapEmbedUrl || DEFAULT_MAP_EMBED_URL}
-                  width="100%"
-                  height="280"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-              <div className="p-4 bg-charcoal-light/95 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-white/80 text-xs">
-                  <MapPin size={14} className="text-brand-gold" />
-                  <span>{project.name} — {project.area || project.location}</span>
-                </div>
-                <a
-                  href={project.googleMapsUrl || "https://maps.app.goo.gl/Bbh2KBct435KMRVKA"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-base btn-gold text-xs px-4 py-2 flex items-center gap-2"
-                >
-                  <MapPin size={13} />
-                  <span>Open in Google Maps ↗</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+          {/* Individual Interactive Google Map Visual */}
+          <ProjectMap
+            name={project.name}
+            location={project.location}
+            area={project.area}
+            lat={project.coordinates?.lat || 22.7196}
+            lng={project.coordinates?.lng || 75.8577}
+            googleMapsUrl={project.googleMapsUrl}
+          />
+        </div>
+      </section>
 
       {/* ── Project Enquiry Form ──────────────────────────────────────────────── */}
       <section

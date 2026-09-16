@@ -6,8 +6,9 @@ import { motion } from "framer-motion";
 import { ArrowRight, Calendar } from "lucide-react";
 
 const stats = [
-  { value: "20+", label: "Years of Experience" },
-  { value: "2000+", label: "Happy Families" },
+  { value: "16+", label: "Years of Trust" },
+  { value: "4000+", label: "Happy Families" },
+  { value: "20+", label: "Developments" },
   { value: "RERA", label: "Approved" },
 ];
 

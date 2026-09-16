@@ -188,9 +188,9 @@ export default function Directors() {
           aria-label="Company achievements"
         >
           {[
-            { num: "20+", label: "Years of Experience" },
-            { num: "8", label: "Completed Projects" },
-            { num: "10+", label: "Ongoing Projects" },
+            { num: "16+", label: "Years of Trust" },
+            { num: "10+", label: "Completed Projects" },
+            { num: "20+", label: "Developments" },
             { num: "4000+", label: "Happy Families" },
             { num: "4", label: "National Awards" },
           ].map((stat) => (
