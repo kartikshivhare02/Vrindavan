@@ -42,6 +42,16 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "./",
   },
+  icons: {
+    icon: [
+      { url: "/logo/vrindavan-logo.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/logo/vrindavan-logo.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: ["/logo/vrindavan-logo.png"],
+  },
   openGraph: {
     type: "website",
     locale: "en_IN",
