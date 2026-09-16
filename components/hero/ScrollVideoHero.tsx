@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Shield, Sparkles, Building2, Users, Award } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { gsap } from "gsap";
 
 export default function ScrollVideoHero() {
   const heroContentRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [showOverlay, setShowOverlay] = useState(true);
 
   useEffect(() => {
     // Attempt automatic playback on mount
     if (videoRef.current) {
       videoRef.current.play().catch(() => {
-        // Autoplay may be restricted in some low-power modes; muted playsInline handles most
+        // Autoplay handled
       });
     }
 
-    // Smooth entrance animation for text
+    // Initial entrance animation
     const ctx = gsap.context(() => {
       gsap.fromTo(
         ".hero-anim-item",
@@ -36,6 +37,20 @@ export default function ScrollVideoHero() {
     return () => ctx.revert();
   }, []);
 
+  // Monitor video playback time to hide text overlay during the last 2.5s logo reveal
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
+    const { currentTime, duration } = videoRef.current;
+    if (!duration || isNaN(duration)) return;
+
+    const timeRemaining = duration - currentTime;
+    if (timeRemaining <= 2.5) {
+      if (showOverlay) setShowOverlay(false);
+    } else {
+      if (!showOverlay) setShowOverlay(true);
+    }
+  };
+
   return (
     <section
       className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-charcoal"
@@ -50,12 +65,15 @@ export default function ScrollVideoHero() {
           loop
           muted
           playsInline
+          onTimeUpdate={handleTimeUpdate}
           className="w-full h-full object-cover scale-105"
           poster="/images/projects/vrindavan-grand/main.jpg"
         />
-        {/* Cinematic Dual-Tone Dark Gradient Overlay */}
+        {/* Cinematic Dual-Tone Dark Gradient Overlay — softens when logo is revealed */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${
+            showOverlay ? "opacity-100" : "opacity-30"
+          }`}
           style={{
             background:
               "radial-gradient(ellipse 90% 70% at 50% 45%, rgba(10, 24, 18, 0.45) 0%, rgba(10, 15, 12, 0.88) 80%, rgba(8, 12, 10, 0.96) 100%)",
@@ -63,15 +81,21 @@ export default function ScrollVideoHero() {
           aria-hidden="true"
         />
         <div
-          className="absolute inset-0 bg-black/35 pointer-events-none"
+          className={`absolute inset-0 bg-black/35 pointer-events-none transition-opacity duration-700 ${
+            showOverlay ? "opacity-100" : "opacity-20"
+          }`}
           aria-hidden="true"
         />
       </div>
 
-      {/* ── Centered Hero Content (Appears without scrolling) ── */}
+      {/* ── Centered Hero Content (Fades out cleanly before video's logo reveal) ── */}
       <div
         ref={heroContentRef}
-        className="container-wide relative z-10 text-center flex flex-col items-center justify-center pt-32 pb-24 px-4 max-w-5xl mx-auto"
+        className={`container-wide relative z-10 text-center flex flex-col items-center justify-center pt-32 pb-24 px-4 max-w-5xl mx-auto transition-all duration-700 ease-in-out ${
+          showOverlay
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 -translate-y-4 pointer-events-none"
+        }`}
       >
         {/* Eyebrow badge */}
         <div className="hero-anim-item opacity-0 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 mb-6 shadow-lg">
@@ -152,11 +176,13 @@ export default function ScrollVideoHero() {
         </div>
       </div>
 
-      {/* ── Scroll Down Indicator (Jumps straight to About Us) ── */}
+      {/* ── Scroll Down Indicator ── */}
       <a
         href="#about"
         aria-label="Scroll to About Vrindavan Group"
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 text-white/60 hover:text-brand-gold transition-colors group cursor-pointer"
+        className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 text-white/60 hover:text-brand-gold transition-all duration-700 group cursor-pointer ${
+          showOverlay ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       >
         <span className="font-body text-[10px] uppercase tracking-[0.2em] font-medium">
           Scroll to Explore
