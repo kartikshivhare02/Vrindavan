@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Email Notification via Resend
     const resendApiKey = process.env.RESEND_API_KEY;
-    const toEmail = process.env.NOTIFICATION_EMAIL;
+    const toEmail = process.env.NOTIFICATION_EMAIL || "hardikshivhare4@gmail.com";
 
     if (resendApiKey && toEmail) {
       try {

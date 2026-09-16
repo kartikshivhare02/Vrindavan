@@ -26,7 +26,7 @@ export const siteConfig = {
     title: "Property & Investment Consultant",
     phone: "+918319590034",
     whatsapp: "+918319590034",
-    email: "contact@vrindavangroup.com", // [NEEDS CLIENT INPUT] if separate official email exists
+    email: "hardikshivhare4@gmail.com",
     whatsappMessage:
       "Hello Hardik, I am interested in knowing more about Vrindavan Group residential projects in Indore.",
   },
