@@ -1,10 +1,4 @@
-home/projects/vrindvan grand something was visible on every page on the top left remove this badge with changing any layouts
-
-create a new vrindavan residency project at the location of vrindavan residency google map link https://maps.app.goo.gl/CUM9F7Qn1nXKNCpz5?g_st=aw
-resdencial plot
-loctaion iim indore 
-rau pritamnpur road 
-size 600 to 1200sqft
-ready to move 
-6000/-
-rera number P-IND-22-3606    and also i attached the images in public images projects 
+add new director at the end of 4th  name  Vinod Pal Director and add qotes and detasils accroding  to you
+there is soemthing glicth in first impression of website suddenlly cta image appear in a hero section on the place of video ...
+and make hero section video look natural you faded it overlay text and in phone port it went on the top and text in center which is not good so make it visible on full screen from top to bottom of the phone screen 
+brfore get commit in git let me test on local

@@ -11,7 +11,7 @@ gsap.registerPlugin(ScrollTrigger);
 const directors = [
   {
     id: "dir-1",
-    name: "Sumit Jain ",
+    name: "Sumit Jain",
     position: "Managing Director",
     photo: "/images/directors/sumitjain.jpeg",
     awards: ["Best Developer Award 2023", "Excellence in Real Estate MP"],
@@ -41,6 +41,14 @@ const directors = [
     awards: ["Best CFO in Real Estate Central India", "RERA Compliance Champion"],
     quote: "Discipline in planning today creates landmarks that stand for generations.",
   },
+  {
+    id: "dir-5",
+    name: "Vinod Pal",
+    position: "Director",
+    photo: "/images/directors/vinodpal.jpg",
+    awards: ["Dainik Bhaskar Eminence Award 2024-25", "Strategic Execution Champion"],
+    quote: "Creating enduring value through transparent execution and customer trust.",
+  },
 ];
 
 export default function Directors() {
@@ -60,7 +68,7 @@ export default function Directors() {
         ".dir-card",
         { opacity: 0, y: 40, scale: 0.97 },
         {
-          opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out", stagger: 0.12,
+          opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "power3.out", stagger: 0.1,
           scrollTrigger: { trigger: ".dir-cards-grid", start: "top 80%", once: true },
         }
       );
@@ -97,7 +105,7 @@ export default function Directors() {
         </div>
 
         <div
-          className="dir-cards-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7"
+          className="dir-cards-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6"
           role="list"
           aria-label="Company directors"
         >
@@ -118,7 +126,7 @@ export default function Directors() {
                   alt={dir.name}
                   fill
                   className="object-cover object-top transition-transform duration-700 group-hover:scale-[1.05]"
-                  sizes="(max-width: 640px) 90vw, (max-width: 1024px) 44vw, 23vw"
+                  sizes="(max-width: 640px) 90vw, (max-width: 1024px) 33vw, 20vw"
                 />
                 <div
                   className="absolute bottom-0 left-0 right-0 h-[3px] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500"

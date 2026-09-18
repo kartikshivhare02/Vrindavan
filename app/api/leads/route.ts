@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     if (resendApiKey && toEmail) {
       try {
         const resend = new Resend(resendApiKey);
-        await resend.emails.send({
+        const { data, error: resendError } = await resend.emails.send({
           from: "Vrindavan Group Leads <onboarding@resend.dev>",
           to: [toEmail],
           subject: `🏡 New Lead Received: ${lead.name} (${lead.phone})`,
@@ -96,7 +96,12 @@ export async function POST(req: NextRequest) {
             </div>
           `,
         });
-        console.log("Email notification sent to", toEmail);
+
+        if (resendError) {
+          console.error("Resend delivery error:", resendError);
+        } else {
+          console.log("Email notification sent to", toEmail, data);
+        }
       } catch (emailErr) {
         console.error("Failed to send lead email notification:", emailErr);
       }
