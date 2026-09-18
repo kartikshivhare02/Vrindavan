@@ -85,7 +85,7 @@ export default function ChannelPartner() {
                   src="/images/hardikshivahare.jpg"
                   alt={`${siteConfig.channelPartner.name} — Property Consultant, Vrindavan Group`}
                   fill
-                  className="object-cover object-top"
+                  className="object-cover object-center"
                   sizes="(max-width: 768px) 340px, 380px"
                   priority
                 />
