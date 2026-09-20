@@ -32,7 +32,13 @@ export default function ProjectsPageClient() {
   return (
     <main className="min-h-screen bg-[#FAFAF8] pb-20">
       {/* ── HERO BANNER ── */}
-      <section className="relative bg-brand-green text-white pt-36 md:pt-44 pb-16 md:pb-20 overflow-hidden mb-12">
+      <section
+        className="relative bg-brand-green text-white overflow-hidden mb-8 md:mb-10"
+        style={{
+          paddingTop: "clamp(96px, 11vw, 130px)",
+          paddingBottom: "clamp(30px, 4vw, 48px)",
+        }}
+      >
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -54,18 +60,22 @@ export default function ProjectsPageClient() {
           aria-hidden="true"
         />
 
-        <div className="container-wide relative z-10 text-center max-w-3xl mx-auto px-4">
-          <p className="font-body text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase mb-3">
+        <div className="container-wide relative z-10 text-center max-w-3xl mx-auto px-4 flex flex-col items-center">
+          <p
+            className="font-body text-xs font-semibold tracking-[0.25em] text-brand-gold uppercase mb-2.5 text-center"
+            style={{ color: "#c9a84c", textAlign: "center" }}
+          >
             Vrindavan Group Portfolio
           </p>
           <h1
-            className="font-heading font-bold text-white mb-4"
-            style={{ fontSize: "clamp(2.4rem, 5.5vw, 4rem)", lineHeight: 1.1 }}
+            className="font-heading font-bold text-white mb-3 text-center"
+            style={{ fontSize: "clamp(2.2rem, 4.5vw, 3.4rem)", lineHeight: 1.15, textAlign: "center" }}
           >
             Our Landmark <span style={{ color: "#c9a84c" }}>Projects</span>
           </h1>
           <p
-            className="font-body leading-relaxed text-white/70 text-sm md:text-base max-w-2xl mx-auto"
+            className="font-body leading-relaxed text-sm md:text-base max-w-2xl mx-auto text-center"
+            style={{ color: "rgba(255, 255, 255, 0.82)", textAlign: "center" }}
           >
             Explore our range of thoughtfully planned residential developments across Indore.
             Built with transparency, quality infrastructure, and long-term community value.
@@ -75,40 +85,81 @@ export default function ProjectsPageClient() {
 
       {/* ── FILTER & SEARCH BAR ── */}
       <div className="container-wide mb-10">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-[#e8e3d8] rounded-sm shadow-sm">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 p-3.5 sm:p-4 bg-white border border-[#e8e3d8] rounded-sm shadow-sm">
           {/* Tabs */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setFilterTab("all")}
-              className={`px-5 py-2.5 text-xs font-body uppercase font-semibold tracking-wider transition-all duration-300 ${
+              style={{
+                height: "42px",
+                padding: "0 20px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "12px",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                borderRadius: "3px",
+                transition: "all 0.25s ease",
+              }}
+              className={
                 filterTab === "all"
                   ? "bg-brand-green text-white shadow-sm"
                   : "bg-[#f5f3ee] text-[#555] hover:bg-[#eae6dd]"
-              }`}
+              }
             >
               All Projects ({projects.length})
             </button>
             <button
               onClick={() => setFilterTab("featured")}
-              className={`px-5 py-2.5 text-xs font-body uppercase font-semibold tracking-wider transition-all duration-300 ${
+              style={{
+                height: "42px",
+                padding: "0 20px",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "12px",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                borderRadius: "3px",
+                transition: "all 0.25s ease",
+              }}
+              className={
                 filterTab === "featured"
                   ? "bg-brand-green text-white shadow-sm"
                   : "bg-[#f5f3ee] text-[#555] hover:bg-[#eae6dd]"
-              }`}
+              }
             >
               Featured ({projects.filter((p) => p.isFeatured).length})
             </button>
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full md:w-80">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div className="relative w-full md:w-80 flex items-center">
+            <Search
+              size={16}
+              className="absolute left-3.5 text-gray-400 pointer-events-none z-10"
+            />
             <input
               type="text"
               placeholder="Search project by name or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-xs font-body bg-[#faf9f6] border border-[#e8e3d8] focus:outline-none focus:border-brand-gold text-charcoal placeholder:text-gray-400"
+              style={{
+                paddingLeft: "42px",
+                paddingRight: "16px",
+                height: "42px",
+                width: "100%",
+                fontSize: "13px",
+                borderRadius: "3px",
+                backgroundColor: "#faf9f6",
+                border: "1px solid #e8e3d8",
+                color: "#111111",
+                outline: "none",
+              }}
+              className="font-body focus:border-brand-gold focus:bg-white transition-all placeholder:text-gray-400"
             />
           </div>
         </div>

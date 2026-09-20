@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Phone, ArrowUpRight } from "lucide-react";
 import { siteConfig } from "@/config/site";
@@ -11,6 +12,8 @@ import { formatWhatsAppUrl } from "@/lib/utils";
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -31,13 +34,16 @@ export default function Navbar() {
   );
   const navLinks = siteConfig.nav;
 
+  // Subpages always use solid backdrop; homepage uses transparent gradient until scrolled
+  const isSolid = !isHomePage || scrolled;
+
   return (
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
-          scrolled
-            ? "bg-[#09150f]/95 backdrop-blur-xl border-b border-white/10 shadow-2xl py-3.5 lg:py-4"
-            : "bg-gradient-to-b from-black/85 via-black/40 to-transparent py-5 lg:py-6"
+          isSolid
+            ? "bg-[#09150f]/95 backdrop-blur-xl border-b border-white/10 shadow-2xl py-3 lg:py-4"
+            : "bg-gradient-to-b from-black/85 via-black/40 to-transparent py-3.5 lg:py-6"
         }`}
         role="banner"
       >
@@ -49,17 +55,17 @@ export default function Navbar() {
             aria-label="Vrindavan Group — Home"
           >
             <div
-              className="relative transition-all duration-300 flex items-center"
-              style={{
-                width: scrolled ? "185px" : "215px",
-                height: scrolled ? "52px" : "62px",
-              }}
+              className={`relative transition-all duration-300 flex items-center ${
+                isSolid
+                  ? "w-[155px] h-[44px] sm:w-[170px] sm:h-[48px] lg:w-[185px] lg:h-[52px]"
+                  : "w-[165px] h-[48px] sm:w-[185px] sm:h-[52px] lg:w-[215px] lg:h-[62px]"
+              }`}
             >
               <Image
                 src="/logo/vrindavan-logo.png"
                 alt="Vrindavan Group"
                 fill
-                sizes="(max-width: 768px) 160px, 215px"
+                sizes="(max-width: 640px) 155px, (max-width: 1024px) 185px, 215px"
                 className="object-contain object-left group-hover:brightness-110 transition-all duration-300"
                 priority
               />

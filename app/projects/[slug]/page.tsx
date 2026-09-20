@@ -143,7 +143,10 @@ export default async function ProjectPage({
 
       {/* ── Project Hero ────────────────────────────────────────────────────── */}
       <section
-        className="relative overflow-hidden flex items-center justify-center min-h-[75vh] md:min-h-[82vh] pt-32 md:pt-36 pb-16"
+        className="relative overflow-hidden flex items-center justify-center min-h-[75vh] md:min-h-[82vh] pb-16"
+        style={{
+          paddingTop: "clamp(140px, 16vw, 200px)",
+        }}
         aria-label={`${project.name} hero image`}
       >
         {/\.(mp4|webm|ogg|mov)$/i.test(project.mainImage) ? (
