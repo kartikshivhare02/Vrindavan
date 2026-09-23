@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Phone, MessageSquare, ArrowUpRight, Globe } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { projects } from "@/data/projects";
@@ -55,33 +56,16 @@ export default function Footer() {
 
           {/* Brand Column */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Text-based logo — always visible on dark bg */}
-            <Link href="/" className="inline-block" aria-label="Vrindavan Group Home">
-              <div className="flex flex-col leading-none">
-                <span
-                  style={{
-                    fontFamily: "var(--font-playfair), Georgia, serif",
-                    fontSize: "1.5rem",
-                    fontWeight: 700,
-                    color: "white",
-                    letterSpacing: "0.07em",
-                    lineHeight: 1,
-                  }}
-                >
-                  VRINDAVAN
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-inter), Inter, system-ui, sans-serif",
-                    fontSize: "0.52rem",
-                    fontWeight: 600,
-                    color: "#c9a84c",
-                    letterSpacing: "0.55em",
-                    marginTop: "5px",
-                  }}
-                >
-                  GROUP
-                </span>
+            {/* Logo */}
+            <Link href="/" className="inline-block group" aria-label="Vrindavan Group Home">
+              <div className="relative w-[180px] h-[65px] sm:w-[210px] sm:h-[75px]">
+                <Image
+                  src="/logo/vrindavan-logo.png"
+                  alt="Vrindavan Group"
+                  fill
+                  sizes="(max-width: 640px) 180px, 210px"
+                  className="object-contain object-left group-hover:brightness-110 transition-all duration-300"
+                />
               </div>
             </Link>
 
