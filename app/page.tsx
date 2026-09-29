@@ -75,11 +75,11 @@ export default function HomePage() {
       {/* 2. ABOUT VRINDAVAN GROUP */}
       <About />
 
-      {/* 3. WHY VRINDAVAN */}
-      <WhyVrindavan />
-
-      {/* 4. PROJECTS SHOWCASE */}
+      {/* 3. PROJECTS SHOWCASE */}
       <ProjectsShowcase />
+
+      {/* 4. WHY VRINDAVAN */}
+      <WhyVrindavan />
 
       {/* 5. LIFESTYLE / FACILITIES */}
       <LifestyleSection />
