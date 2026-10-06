@@ -29,7 +29,7 @@ const directors = [
     id: "dir-3",
     name: "Vishal Joshi",
     position: "Director",
-    photo: "/images/directors/vishal.png",
+    photo: "/images/directors/vishaljoshi.jpeg",
     awards: ["Top Real Estate Brand Indore 2023", "Consumer Trust Award"],
     quote: "Every home we deliver is a promise kept and a relationship earned.",
   },
