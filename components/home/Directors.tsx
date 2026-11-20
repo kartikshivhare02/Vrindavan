@@ -49,6 +49,14 @@ const directors = [
     awards: ["Dainik Bhaskar Eminence Award 2024-25", "Strategic Execution Champion"],
     quote: "Creating enduring value through transparent execution and customer trust.",
   },
+  {
+    id: "dir-6",
+    name: "Sapna Rathore",
+    position: "Director",
+    photo: "/images/directors/sapnarathore.png",
+    awards: ["Women Leadership in Real Estate", "Excellence in Customer Relations"],
+    quote: "Building homes is about crafting spaces where families thrive and dreams take root.",
+  },
 ];
 
 export default function Directors() {
@@ -105,7 +113,7 @@ export default function Directors() {
         </div>
 
         <div
-          className="dir-cards-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6"
+          className="dir-cards-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8"
           role="list"
           aria-label="Company directors"
         >
@@ -126,7 +134,7 @@ export default function Directors() {
                   alt={dir.name}
                   fill
                   className="object-cover object-top transition-transform duration-700 group-hover:scale-[1.05]"
-                  sizes="(max-width: 640px) 90vw, (max-width: 1024px) 33vw, 20vw"
+                  sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw"
                 />
                 <div
                   className="absolute bottom-0 left-0 right-0 h-[3px] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500"
